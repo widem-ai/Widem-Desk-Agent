@@ -1,0 +1,84 @@
+{
+  "demo": true,
+  "notice_en": "Demo business, fictional. Every name, service and price in this file is invented for the Widem Agent Desk demo. It is not a real company and no real person appears here.",
+  "notice_ar": "نشاط تجريبي وهمي. كل الأسماء والخدمات والأسعار في هذا الملف مختلقة لعرض Widem Agent Desk، وليست لشركة حقيقية ولا تخص أي شخص حقيقي.",
+  "business": {
+    "name_en": "Darb Career Studio (demo)",
+    "name_ar": "استوديو درب المهني (تجريبي)",
+    "kind": "career services"
+  },
+  "currency": "SAR",
+  "tiers": [
+    { "id": "junior", "name_en": "Graduate or junior (0 to 3 years)", "name_ar": "خريج أو مبتدئ (من 0 إلى 3 سنوات)" },
+    { "id": "mid", "name_en": "Mid-level (3 to 8 years)", "name_ar": "مستوى متوسط (من 3 إلى 8 سنوات)" },
+    { "id": "senior", "name_en": "Senior or manager (8+ years)", "name_ar": "خبير أو مدير (أكثر من 8 سنوات)" },
+    { "id": "executive", "name_en": "Executive or director", "name_ar": "تنفيذي أو مدير عام" }
+  ],
+  "services": [
+    {
+      "id": "cv_rewrite",
+      "name_en": "CV rewrite",
+      "name_ar": "إعادة كتابة السيرة الذاتية",
+      "description_en": "A full rewrite of your CV for the roles you are targeting. Delivered in 5 working days.",
+      "description_ar": "إعادة كتابة كاملة لسيرتك الذاتية للوظائف التي تستهدفها. التسليم خلال 5 أيام عمل.",
+      "document": true,
+      "prices": { "junior": 350, "mid": 550, "senior": 850, "executive": 1400 }
+    },
+    {
+      "id": "linkedin_profile",
+      "name_en": "LinkedIn profile",
+      "name_ar": "تحسين ملف LinkedIn",
+      "description_en": "Headline, about section and experience rewritten to match your CV. Delivered in 5 working days.",
+      "description_ar": "إعادة صياغة العنوان والنبذة والخبرات بما يتوافق مع سيرتك الذاتية. التسليم خلال 5 أيام عمل.",
+      "document": true,
+      "prices": { "junior": 250, "mid": 400, "senior": 600, "executive": 950 }
+    },
+    {
+      "id": "cover_letter",
+      "name_en": "Cover letter",
+      "name_ar": "خطاب التقديم",
+      "description_en": "One cover letter you can adapt for each application. Delivered in 5 working days.",
+      "description_ar": "خطاب تقديم واحد يمكنك تعديله لكل طلب توظيف. التسليم خلال 5 أيام عمل.",
+      "document": true,
+      "prices": { "junior": 150, "mid": 200, "senior": 300, "executive": 450 }
+    },
+    {
+      "id": "interview_coaching",
+      "name_en": "Interview coaching (one 60-minute session)",
+      "name_ar": "تدريب على المقابلات (جلسة واحدة مدتها 60 دقيقة)",
+      "description_en": "A mock interview for your target role with written feedback afterwards.",
+      "description_ar": "مقابلة تجريبية للوظيفة التي تستهدفها مع ملاحظات مكتوبة بعدها.",
+      "document": false,
+      "prices": { "junior": 300, "mid": 450, "senior": 700, "executive": 1100 }
+    }
+  ],
+  "bundles": [
+    {
+      "id": "career_pack",
+      "name_en": "Career pack",
+      "name_ar": "الباقة المهنية",
+      "services": ["cv_rewrite", "linkedin_profile", "cover_letter"],
+      "discount_percent": 10,
+      "rule_en": "Order the CV rewrite, LinkedIn profile and cover letter together and those three are 10% off.",
+      "rule_ar": "عند طلب السيرة الذاتية وملف LinkedIn وخطاب التقديم معًا، تحصل على خصم 10% على الثلاثة."
+    }
+  ],
+  "addons": [
+    {
+      "id": "express",
+      "name_en": "Express delivery (2 working days)",
+      "name_ar": "تسليم سريع (يوما عمل)",
+      "pricing": { "type": "flat_per_order", "amount": 250 },
+      "rule_en": "250 SAR per order, whatever is in it.",
+      "rule_ar": "250 ريالًا للطلب الواحد مهما كان محتواه."
+    },
+    {
+      "id": "arabic_version",
+      "name_en": "Arabic version of each document",
+      "name_ar": "نسخة عربية من كل مستند",
+      "pricing": { "type": "flat_per_document", "amount": 200 },
+      "rule_en": "200 SAR for each document service in the order (CV, LinkedIn profile, cover letter). Not available for coaching alone.",
+      "rule_ar": "200 ريال لكل خدمة مستند في الطلب (السيرة الذاتية، ملف LinkedIn، خطاب التقديم). غير متاحة للتدريب وحده."
+    }
+  ]
+}

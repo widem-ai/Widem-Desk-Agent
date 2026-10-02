@@ -1,0 +1,17 @@
+{
+  "name": "widem-agent-desk",
+  "version": "0.1.0",
+  "description": "One brain, two doors: a service desk that people and AI agents can both talk to. Demo business, fictional.",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test \"test/*.test.mjs\"",
+    "start": "node src/mcp-server.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.31.0",
+    "zod": "3.25.76"
+  }
+}
