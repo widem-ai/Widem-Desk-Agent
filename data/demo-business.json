@@ -80,5 +80,31 @@
       "rule_en": "200 SAR for each document service in the order (CV, LinkedIn profile, cover letter). Not available for coaching alone.",
       "rule_ar": "200 ريال لكل خدمة مستند في الطلب (السيرة الذاتية، ملف LinkedIn، خطاب التقديم). غير متاحة للتدريب وحده."
     }
-  ]
+  ],
+  "availability": {
+    "demo": true,
+    "note_en": "Fictional opening hours and closures for the demo. A booking is a 60-minute kickoff call.",
+    "note_ar": "ساعات عمل وأيام إغلاق وهمية لغرض العرض. الحجز مكالمة افتتاحية مدتها 60 دقيقة.",
+    "timezone": "Asia/Riyadh",
+    "slot_minutes": 60,
+    "booking_window_days": 21,
+    "max_days_per_check": 7,
+    "weekly_hours": {
+      "sun": [["10:00", "13:00"], ["14:00", "18:00"]],
+      "mon": [["10:00", "13:00"], ["14:00", "18:00"]],
+      "tue": [["10:00", "13:00"], ["14:00", "18:00"]],
+      "wed": [["10:00", "13:00"], ["14:00", "18:00"]],
+      "thu": [["10:00", "13:00"], ["14:00", "18:00"]],
+      "fri": [],
+      "sat": []
+    },
+    "blocked_dates": ["2026-10-08", "2026-10-22", "2026-11-05"]
+  },
+  "handover": {
+    "refusal_codes": ["unknown_service", "unknown_tier", "unknown_addon", "addon_not_applicable"],
+    "reasons": ["unknown_service", "unknown_tier", "unknown_addon", "addon_not_applicable", "talk_to_a_person", "out_of_rules"],
+    "default_reason": "out_of_rules",
+    "tell_customer_en": "A member of the team will reply to you personally. Nothing has been booked or charged yet.",
+    "tell_customer_ar": "سيتواصل معك أحد أعضاء الفريق شخصيًا. لم يتم أي حجز أو دفع حتى الآن."
+  }
 }

@@ -101,3 +101,6 @@ export function quote(input) {
     total: subtotal - discount + addonsTotal,
   };
 }
+
+/** The frozen rules file, for the stateful part of the desk (src/desk.mjs). Never sent to a customer whole. */
+export const RULES = DATA;
