@@ -2,12 +2,15 @@
 // tools as the agent door, in-process. Every tool result comes from the desk, never from the model.
 import { readFileSync } from 'node:fs';
 import { TOOLS, checkArgs, toJsonSchema } from './tools.mjs';
+import { ungrounded } from './guard.mjs';
 
 const HUMAN = { door: 'human' };
 const HO = JSON.parse(readFileSync(new URL('../data/demo-business.json', import.meta.url), 'utf8')).handover;
 export const DEFAULT_MODEL = 'nvidia/nemotron-3-super-120b-a12b';
 const ARABIC = /[؀-ۿ]/;
-const KEEPS_TRANSCRIPT = new Set(['book', 'handover']);
+const KEEPS_TRANSCRIPT = new Set(['quote', 'book', 'handover']); // quote: a refusal it hands over keeps the chat
+// Messages the customer never saw (a reply the guard stopped, the desk's correction): kept out of history and transcripts.
+const HIDDEN = new WeakSet();
 
 export const SYSTEM_PROMPT = [
   'You are the front desk of a career-services studio (a fictional demo business). You help one customer',
@@ -35,7 +38,7 @@ export const sorryReply = (text) => (ARABIC.test(text ?? '')
 
 /** The conversation as plain text for the owner page: customer and desk lines only, no tool traffic. */
 export const transcriptOf = (messages) => messages
-  .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
+  .filter((m) => !HIDDEN.has(m) && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
   .map((m) => `${m.role === 'user' ? 'Customer' : 'Desk'}: ${m.content.trim()}`)
   .join('\n');
 
@@ -69,13 +72,35 @@ export function createChat({ desk, model, maxRounds = 6 }) {
       const messages = [{ role: 'system', content: SYSTEM_PROMPT }, ...history, { role: 'user', content: text }];
       const toolCalls = [];
       let modelId;
+      let corrected = false;
+      const visible = () => messages.slice(1).filter((m) => !HIDDEN.has(m));
+      // Stop and pass the customer to a person, with the conversation the customer actually saw.
+      const handOver = (summary, flag) => {
+        const { handover } = desk.handover({ reason: 'out_of_rules', transcript: transcriptOf(messages), summary }, HUMAN);
+        const reply = ARABIC.test(text) ? HO.tell_customer_ar : HO.tell_customer_en;
+        messages.push({ role: 'assistant', content: reply });
+        return { reply, toolCalls, modelId, [flag]: true, handover, history: visible() };
+      };
       for (let round = 0; round < maxRounds; round += 1) {
         const out = await model.complete({ messages, tools: CHAT_TOOLS });
         modelId = out.modelId;
         const message = out.message;
         messages.push(message);
         if (!message.tool_calls?.length) {
-          return { reply: message.content ?? '', toolCalls, modelId, history: messages.slice(1) };
+          // Every SAR amount and time in the reply must be one a desk tool returned in this session.
+          const results = messages.filter((m) => m.role === 'tool').map((m) => JSON.parse(m.content));
+          const invented = ungrounded(message.content, results);
+          if (!invented.length) return { reply: message.content ?? '', toolCalls, modelId, history: visible() };
+          HIDDEN.add(message);
+          if (corrected) {
+            return handOver(`The reply stated ${invented.join(', ')}, which no desk tool returned. Last message: ${text}`, 'guarded');
+          }
+          corrected = true;
+          const correction = { role: 'user', content: `Desk check, not from the customer: your reply stated ${invented.join(', ')}, `
+            + 'which no tool returned. Call the tool that gives the real value, or answer without stating it.' };
+          HIDDEN.add(correction);
+          messages.push(correction);
+          continue;
         }
         for (const call of message.tool_calls) {
           const result = runTool(desk, call, messages);
@@ -83,12 +108,8 @@ export function createChat({ desk, model, maxRounds = 6 }) {
           messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(result) });
         }
       }
-      // The model kept calling tools without answering: stop and pass the customer to a person.
-      const { handover } = desk.handover({ reason: 'out_of_rules', transcript: transcriptOf(messages),
-        summary: `The chat stopped after ${maxRounds} tool rounds without an answer. Last message: ${text}` }, HUMAN);
-      const reply = ARABIC.test(text) ? HO.tell_customer_ar : HO.tell_customer_en;
-      messages.push({ role: 'assistant', content: reply });
-      return { reply, toolCalls, modelId, capped: true, handover, history: messages.slice(1) };
+      // The model kept calling tools without answering.
+      return handOver(`The chat stopped after ${maxRounds} tool rounds without an answer. Last message: ${text}`, 'capped');
     },
   };
 }
