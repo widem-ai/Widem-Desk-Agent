@@ -54,7 +54,7 @@ test('P4 itemises lines, bundle and add-ons', () => {
     [['cv_rewrite', 1400], ['linkedin_profile', 950], ['cover_letter', 450], ['interview_coaching', 1100]]);
   assert.equal(q.subtotal, 3900);
   assert.deepEqual(q.bundle, { id: 'career_pack', discount: 280 });
-  assert.deepEqual(q.addons, [{ id: 'express', price: 250 }, { id: 'arabic_version', price: 600 }]); // catalogue order
+  assert.deepEqual(q.addons.map((a) => [a.id, a.price]), [['express', 250], ['arabic_version', 600]]); // catalogue order; names: labels.test
 });
 
 test('A2b at the core: the same input always gives the identical quote', () => {

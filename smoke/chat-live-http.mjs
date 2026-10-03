@@ -6,6 +6,7 @@ import { createHttpServer } from '../src/mcp-server.mjs';
 import { createNebiusModel } from '../src/chat.mjs';
 import { createDesk } from '../src/desk.mjs';
 import { createMemoryStore } from '../src/store.mjs';
+import { latinWords } from '../src/latin.mjs';
 
 const TURNS = [
   'مرحبا، أنا مدير بخبرة ١٢ سنة. كم سعر إعادة كتابة السيرة الذاتية مع ملف لينكدإن؟',
@@ -20,6 +21,7 @@ const url = `http://127.0.0.1:${server.address().port}/chat`;
 console.log(`POST ${url} (memory store)`);
 
 let sessionId; // issued by the server on the first reply
+const latin = [];
 try {
   for (const message of TURNS) {
     const started = Date.now();
@@ -30,7 +32,12 @@ try {
     console.log(`\n> ${message}`);
     console.log(`< HTTP ${res.status} in ${((Date.now() - started) / 1000).toFixed(1)} s${body.booked ? ` booked ${body.booked.reference}` : ''}${body.handover ? ` handover ${body.handover.id}` : ''}`);
     console.log(body.reply ?? JSON.stringify(body.error));
+    const words = latinWords(body.reply);
+    latin.push(...words);
+    console.log(`[Latin words outside the allowed list: ${words.length}${words.length ? ` (${words.join(", ")})` : ""}]`);
   }
+  console.log(`
+Latin words in Arabic replies, all turns: ${latin.length}`);
   const [booking] = store.all('bookings');
   console.log('\nStored bookings:', store.all('bookings').length, '| handovers:', store.all('handovers').length);
   if (booking) {

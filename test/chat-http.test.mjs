@@ -56,7 +56,7 @@ test('the server issues the session id; a booking keeps the facts and the whole 
   const model = scriptedModel([
     { role: 'assistant', content: '\n\nWhat is your name and email?' },
     toolCall('c1', 'book', { ...ORDER, slot: SLOT, customer_name: 'Sara', contact: 'sara@example.com' }),
-    { role: 'assistant', content: 'Booked: BK-0001.' },
+    { role: 'assistant', content: 'Booked: BK-0001, Tuesday 10:00 to 11:00, 1575 SAR.' },
   ]);
   await withServer(model, async ({ customer, store }) => {
     const say = customer();
@@ -69,7 +69,7 @@ test('the server issues the session id; a booking keeps the facts and the whole 
     const second = await say('Sara, sara@example.com');
     assert.equal(second.status, 200);
     assert.equal(second.json.sessionId, first.json.sessionId);
-    assert.equal(second.json.reply, 'Booked: BK-0001.');
+    assert.equal(second.json.reply, 'Booked: BK-0001, Tuesday 10:00 to 11:00, 1575 SAR.');
     const [stored] = store.all('bookings');
     assert.deepEqual(second.json.booked, stored);
     assert.equal(stored.door, 'human');
@@ -78,7 +78,7 @@ test('the server issues the session id; a booking keeps the facts and the whole 
     assert.equal(stored.is_executive, false);
     assert.ok(model.seen[1].some((m) => m.role === 'user' && /Full career pack/.test(m.content)));
     // The stored conversation runs to the end of the turn, so the owner sees the confirmation too.
-    assert.match(stored.transcript, /Full career pack[\s\S]*What is your name[\s\S]*sara@example.com[\s\S]*Desk: Booked: BK-0001\.$/);
+    assert.match(stored.transcript, /Full career pack[\s\S]*What is your name[\s\S]*sara@example.com[\s\S]*Desk: Booked: BK-0001, Tuesday 10:00 to 11:00, 1575 SAR\.$/);
   });
 });
 

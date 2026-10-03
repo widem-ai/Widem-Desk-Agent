@@ -2,7 +2,7 @@
 // time in it must be a value some desk tool returned (in this turn or earlier in the session).
 // Harmless numbers (years of experience, "60-minute call", a year) are not amounts or times and pass.
 
-const toWestern = (text) => text
+export const toWestern = (text) => text
   .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
   .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06F0))
   .replace(/٫/g, '.') // Arabic decimal separator

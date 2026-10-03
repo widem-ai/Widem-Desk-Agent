@@ -98,7 +98,7 @@ export function quote(input) {
     } else {
       return refuse('unknown_addon', `Add-on "${a.id}" has no pricing rule.`);
     }
-    addons.push({ id: a.id, price });
+    addons.push({ id: a.id, name_en: a.name_en, name_ar: a.name_ar, price });
   }
   const addonsTotal = addons.reduce((sum, a) => sum + a.price, 0);
 
@@ -107,6 +107,8 @@ export function quote(input) {
     demo: true,
     currency: DATA.currency,
     tier,
+    tier_name_en: DATA.tiers.find((t) => t.id === tier).name_en,
+    tier_name_ar: DATA.tiers.find((t) => t.id === tier).name_ar,
     lines,
     subtotal,
     bundle,

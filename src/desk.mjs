@@ -2,6 +2,7 @@
 // Every door calls these and nothing else. The clock is injected so the rules stay testable;
 // all times are computed in the business's timezone from the rules file, never the server's.
 import { quote as priceOrder, tierFor, RULES } from './core.mjs';
+import { slotLabels } from './labels.mjs';
 
 const AV = RULES.availability;
 const HO = RULES.handover;
@@ -145,10 +146,14 @@ export function createDesk({ store, now = () => new Date() }) {
       const slots = [];
       for (let i = 0; i < days; i += 1) {
         for (const t of slotsOn(addDays(from, i))) {
-          if (bookable(t, current) && !taken.has(t)) slots.push({ start: formatLocal(t), end: formatLocal(t + SLOT_MS) });
+          if (bookable(t, current) && !taken.has(t)) {
+            const [start, end] = [formatLocal(t), formatLocal(t + SLOT_MS)];
+            slots.push({ start, end, ...slotLabels(start, end, AV) });
+          }
         }
       }
-      return { ok: true, demo: true, timezone: AV.timezone, slot_minutes: AV.slot_minutes, from, days, slots };
+      return { ok: true, demo: true, timezone: AV.timezone, slot_minutes: AV.slot_minutes,
+        call_name_en: AV.call_name_en, call_name_ar: AV.call_name_ar, from, days, slots };
     },
 
     /** The slice 1 quote; a refusal the rules cannot price is handed over automatically. */

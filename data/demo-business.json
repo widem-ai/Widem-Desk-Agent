@@ -83,6 +83,10 @@
   ],
   "availability": {
     "demo": true,
+    "call_name_en": "kickoff call",
+    "call_name_ar": "مكالمة البداية",
+    "time_name_en": "Riyadh time",
+    "time_name_ar": "بتوقيت الرياض",
     "note_en": "Fictional opening hours and closures for the demo. A booking is a 60-minute kickoff call.",
     "note_ar": "ساعات عمل وأيام إغلاق وهمية لغرض العرض. الحجز مكالمة افتتاحية مدتها 60 دقيقة.",
     "timezone": "Asia/Riyadh",

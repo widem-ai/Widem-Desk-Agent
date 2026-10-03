@@ -2,10 +2,13 @@
 // tools as the agent door, in-process. Every tool result comes from the desk, never from the model.
 import { readFileSync } from 'node:fs';
 import { TOOLS, checkArgs, toJsonSchema } from './tools.mjs';
-import { ungrounded } from './guard.mjs';
+import { toWestern, ungrounded } from './guard.mjs';
+import { slotLabels } from './labels.mjs';
 
 const HUMAN = { door: 'human' };
-const HO = JSON.parse(readFileSync(new URL('../data/demo-business.json', import.meta.url), 'utf8')).handover;
+const DATA = JSON.parse(readFileSync(new URL('../data/demo-business.json', import.meta.url), 'utf8'));
+const HO = DATA.handover;
+const AV = DATA.availability;
 export const DEFAULT_MODEL = 'nvidia/nemotron-3-super-120b-a12b';
 const ARABIC = /[؀-ۿ]/;
 const KEEPS_TRANSCRIPT = new Set(['quote', 'book', 'handover']); // quote: a refusal it hands over keeps the chat
@@ -17,11 +20,13 @@ export const SYSTEM_PROMPT = [
   'choose services, get a price and book a 60-minute kickoff call.',
   'Rules you never break:',
   '1. Never state a price, a discount or a total yourself. Call quote and repeat the total exactly as it returned.',
-  '2. Never state a free time yourself. Call check_availability and offer only slots it returned. Book with book',
+  '2. Never state a free time yourself. Call check_availability and offer at most five of the slots it returned, as a plain',
+  'list of their labels. Book with book',
   'and repeat the booking reference exactly as it returned.',
   '3. Anything the tools do not cover (a discount, a complaint, a request outside the rules, or a customer who',
   'asks for a person) goes to handover. Then tell the customer what handover returned.',
-  '4. Reply in the language the customer writes in: Arabic or English. Keep replies short.',
+  '4. Reply in the language the customer writes in: Arabic or English. In Arabic, use the Arabic names and labels the',
+  'tools return (name_ar, tier_name_ar, label_ar, call_name_ar), never ids. Keep replies short.',
   '5. Ask for the customer name and a contact (email or phone) before booking.',
 ].join('\n');
 
@@ -51,6 +56,29 @@ export function plainDashes(text) {
     .replace(/(\d)\s*[\u2012-\u2015]\s*(?=\d)/g, `$1${to}`)
     .replace(/\s+[\u2012-\u2015]\s+/g, ', ')
     .replace(/[\u2010-\u2015]/g, '-');
+}
+
+// A line that teases more slots ("and more", an ellipsis) instead of listing them.
+const TEASER = /…|\.\.\.|(?:مواعيد|فترات|أوقات)\s+(?:إضافية|أخرى)|وغيرها|\b(?:more|other)\s+(?:slots|times|openings)\b/i;
+
+/** Drop teaser lines from a reply that offers slots; a reply with none comes back unchanged. */
+export function dropTeasers(text) {
+  if (typeof text !== 'string') return text;
+  const lines = text.split('\n');
+  const kept = lines.filter((line) => !TEASER.test(line));
+  if (kept.length === lines.length) return text;
+  return kept.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '');
+}
+
+/** Make sure a booking confirmation states the slot and the price, taken from the book result. */
+export function withConfirmation(reply, booking, arabic) {
+  const { start, end } = booking.slot;
+  const plain = toWestern(reply);
+  if (plain.includes(String(booking.price_quoted)) && plain.includes(start.slice(11, 16))) return reply;
+  const { label_en, label_ar } = slotLabels(start, end, AV);
+  const line = arabic ? `الموعد: ${label_ar}. السعر: ${booking.price_quoted} ريال.`
+    : `Your call: ${label_en}. Price: ${booking.price_quoted} SAR.`;
+  return `${reply.replace(/\s+$/, '')}\n\n${line}`;
 }
 
 const failure = (code, message) => ({ ok: false, demo: true, error: { code, message } });
@@ -111,7 +139,16 @@ export function createChat({ desk, model, maxRounds = 6 }) {
           // Every SAR amount and time in the reply must be one a desk tool returned in this session.
           const results = messages.filter((m) => m.role === 'tool').map((m) => JSON.parse(m.content));
           const invented = ungrounded(message.content, results);
-          if (!invented.length) return finish({ reply: message.content ?? '', toolCalls, modelId, history: visible() });
+          if (!invented.length) {
+            // Deterministic post-steps on a reply the guard passed: no teaser lines, and a confirmation that
+            // states the slot and price from the book result. Both add only values a tool returned.
+            let reply = message.content ?? '';
+            if (toolCalls.some((c) => c.name === 'check_availability')) reply = dropTeasers(reply);
+            const booking = toolCalls.findLast((c) => c.name === 'book' && c.result?.ok)?.result.booking;
+            if (booking) reply = withConfirmation(reply, booking, ARABIC.test(text));
+            message.content = reply;
+            return finish({ reply, toolCalls, modelId, history: visible() });
+          }
           HIDDEN.add(message);
           if (corrected) {
             return handOver(`The reply stated ${invented.join(', ')}, which no desk tool returned. Last message: ${text}`, 'guarded');

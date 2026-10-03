@@ -53,12 +53,12 @@ test('an Arabic booking through the chat equals the agent door booking, apart fr
   const model = scriptedModel([
     toolCall('c1', 'quote', ORDER),
     toolCall('c2', 'book', { ...ORDER, slot: SLOT, ...CUSTOMER }),
-    { role: 'assistant', content: 'تم الحجز. رقم الحجز BK-0001.' },
+    { role: 'assistant', content: 'تم الحجز. رقم الحجز BK-0001، الثلاثاء 10:00 إلى 11:00، السعر 1575 ريال.' },
   ]);
   const chat = createChat({ desk, model });
   const out = await chat.respond([], 'أريد الباقة الكاملة، عندي خبرة ١٢ سنة، واحجز لي الثلاثاء الساعة ١٠');
 
-  assert.equal(out.reply, 'تم الحجز. رقم الحجز BK-0001.');
+  assert.equal(out.reply, 'تم الحجز. رقم الحجز BK-0001، الثلاثاء 10:00 إلى 11:00، السعر 1575 ريال.');
   assert.equal(out.modelId, 'fake/scripted');
   assert.deepEqual(out.toolCalls.map((c) => c.name), ['quote', 'book']);
 

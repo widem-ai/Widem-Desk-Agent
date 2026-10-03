@@ -37,7 +37,8 @@ export const TOOLS = [
     title: 'Check free slots',
     description: 'List free 60-minute kickoff-call slots, in Asia/Riyadh time (UTC+3). Optionally pass from '
       + '(YYYY-MM-DD, default today in Riyadh) and days (1 to 7, default 7). Each slot has a start and end with '
-      + 'the offset included; pass a start to book exactly as returned.',
+      + 'the offset included; pass a start to book exactly as returned. Each slot also has label_en and label_ar '
+      + 'to show the customer.',
     params: {
       from: { type: 'string', optional: true, describe: 'First date to check, YYYY-MM-DD in Riyadh time' },
       days: { type: 'number', optional: true, describe: 'How many days to check, 1 to 7' },
