@@ -46,7 +46,9 @@ data/demo-business.json   the fictional business: services, tiers, prices, bundl
 src/core.mjs              the one brain, pricing: pure, deterministic listServices() and quote()
 src/desk.mjs              the one brain, state: checkAvailability(), book(), handover()
 src/store.mjs             storage behind all(kind) and add(kind, record): memory or one JSON file
+src/tools.mjs             the five tools, defined once; both doors build their tool lists from here
 src/mcp-server.mjs        the agent door: MCP over Streamable HTTP, calls the core only
+src/chat.mjs              the human door brain: a Nemotron chat loop calling the same tools in-process
 test/                     core, availability and booking tests, the five scripted profiles, the MCP door test
 smoke/                    the day-1 smoke test (model tool calling and a first MCP server)
 ```

@@ -1,0 +1,116 @@
+// The human door's chat loop, with a scripted fake model (no network). Every tool result the
+// model sees must come from the desk, and a booking made here must equal the agent door's.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { createHttpServer } from '../src/mcp-server.mjs';
+import { createChat, CHAT_TOOLS } from '../src/chat.mjs';
+import { createDesk } from '../src/desk.mjs';
+import { createMemoryStore } from '../src/store.mjs';
+import { PROFILES } from './profiles.mjs';
+
+const at = (iso) => () => new Date(iso);
+const NOW = '2026-10-04T08:00:00+03:00'; // Sunday, before opening
+const SLOT = '2026-10-06T10:00:00+03:00'; // Tuesday, first slot of the day
+const CUSTOMER = { customer_name: 'سارة أحمد', contact: 'sara@example.com' };
+const ORDER = PROFILES[1].input; // full career pack, senior
+
+// A fake model that plays back one scripted assistant message per round and records what it was sent.
+function scriptedModel(rounds) {
+  const seen = [];
+  return {
+    seen,
+    async complete({ messages, tools }) {
+      seen.push({ messages: structuredClone(messages), tools });
+      const message = rounds[Math.min(seen.length - 1, rounds.length - 1)];
+      return { message, modelId: 'fake/scripted' };
+    },
+  };
+}
+const toolCall = (id, name, args) => ({ role: 'assistant', content: null,
+  tool_calls: [{ id, type: 'function', function: { name, arguments: JSON.stringify(args) } }] });
+
+async function agentDoorBooking(args) {
+  const store = createMemoryStore();
+  const server = createHttpServer({ desk: createDesk({ store, now: at(NOW) }) });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const client = new Client({ name: 'chat-parity-test', version: '0.0.0' });
+  await client.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${server.address().port}/mcp`)));
+  try {
+    const result = await client.callTool({ name: 'book', arguments: args });
+    const { tools } = await client.listTools();
+    return { booking: JSON.parse(result.content[0].text).booking, tools };
+  } finally {
+    await client.close();
+    await new Promise((resolve) => server.close(resolve));
+  }
+}
+
+test('an Arabic booking through the chat equals the agent door booking, apart from the door', async () => {
+  const store = createMemoryStore();
+  const desk = createDesk({ store, now: at(NOW) });
+  const model = scriptedModel([
+    toolCall('c1', 'quote', ORDER),
+    toolCall('c2', 'book', { ...ORDER, slot: SLOT, ...CUSTOMER }),
+    { role: 'assistant', content: 'تم الحجز. رقم الحجز BK-0001.' },
+  ]);
+  const chat = createChat({ desk, model });
+  const out = await chat.respond([], 'أريد الباقة الكاملة، عندي خبرة ١٢ سنة، واحجز لي الثلاثاء الساعة ١٠');
+
+  assert.equal(out.reply, 'تم الحجز. رقم الحجز BK-0001.');
+  assert.equal(out.modelId, 'fake/scripted');
+  assert.deepEqual(out.toolCalls.map((c) => c.name), ['quote', 'book']);
+
+  // The model saw the desk's own results, never anything it made up.
+  const toolMessages = model.seen[2].messages.filter((m) => m.role === 'tool');
+  assert.deepEqual(toolMessages.map((m) => m.tool_call_id), ['c1', 'c2']);
+  assert.deepEqual(JSON.parse(toolMessages[0].content), desk.quote(ORDER, { door: 'human' }));
+  assert.equal(JSON.parse(toolMessages[0].content).total, PROFILES[1].total);
+  assert.deepEqual(JSON.parse(toolMessages[1].content).booking, store.all('bookings')[0]);
+
+  const human = store.all('bookings');
+  assert.equal(human.length, 1);
+  assert.equal(human[0].door, 'human');
+  const agent = await agentDoorBooking({ ...ORDER, slot: SLOT, ...CUSTOMER });
+  assert.equal(agent.booking.door, 'agent');
+  assert.deepEqual({ ...human[0], door: 'same' }, { ...agent.booking, door: 'same' });
+});
+
+test('the chat offers the model exactly the agent door tools, with the same parameters', async () => {
+  const { tools } = await agentDoorBooking({ ...ORDER, slot: SLOT, ...CUSTOMER });
+  const fromMcp = tools.map((t) => ({ name: t.name, props: Object.keys(t.inputSchema.properties ?? {}).sort(),
+    required: [...(t.inputSchema.required ?? [])].sort() })).sort((a, b) => a.name.localeCompare(b.name));
+  const fromChat = CHAT_TOOLS.map(({ function: f }) => ({ name: f.name, props: Object.keys(f.parameters.properties).sort(),
+    required: [...(f.parameters.required ?? [])].sort() })).sort((a, b) => a.name.localeCompare(b.name));
+  assert.deepEqual(fromChat, fromMcp);
+});
+
+test('a model that never stops calling tools is cut off at the round cap and handed to a person', async () => {
+  const store = createMemoryStore();
+  const desk = createDesk({ store, now: at(NOW) });
+  const model = scriptedModel([toolCall('loop', 'list_services', {})]);
+  const chat = createChat({ desk, model, maxRounds: 3 });
+  const out = await chat.respond([], 'Hello, what do you offer?');
+
+  assert.equal(model.seen.length, 3);
+  assert.equal(out.toolCalls.length, 3);
+  assert.equal(out.capped, true);
+  assert.equal(store.all('handovers').length, 1);
+  assert.equal(store.all('handovers')[0].door, 'human');
+  assert.match(out.reply, /team will reply/);
+});
+
+test('an unknown tool or broken arguments come back to the model as a desk error, not a crash', async () => {
+  const desk = createDesk({ store: createMemoryStore(), now: at(NOW) });
+  const model = scriptedModel([
+    { role: 'assistant', content: null, tool_calls: [
+      { id: 'x1', type: 'function', function: { name: 'give_discount', arguments: '{}' } },
+      { id: 'x2', type: 'function', function: { name: 'quote', arguments: '{not json' } }] },
+    { role: 'assistant', content: 'Sorry.' },
+  ]);
+  const out = await createChat({ desk, model }).respond([], 'Hi');
+  const results = model.seen[1].messages.filter((m) => m.role === 'tool').map((m) => JSON.parse(m.content));
+  assert.deepEqual(results.map((r) => [r.ok, r.error.code]), [[false, 'unknown_tool'], [false, 'bad_arguments']]);
+  assert.equal(out.reply, 'Sorry.');
+});
