@@ -91,3 +91,14 @@ test('teaser lines ("and more", an ellipsis) are dropped from a slot list; the s
     say('Free:\n- 10:00 to 11:00\n...\n(More slots are available later in the week.)\nWhich one?')]);
   assert.equal((await createChat({ desk: fresh().desk, model: en }).respond([], 'When?')).reply, 'Free:\n- 10:00 to 11:00\nWhich one?');
 });
+
+test('a confirmation that states the slot but not the price gets only the price, so nothing is said twice', async () => {
+  const { desk } = fresh();
+  const text = 'تم الحجز. رقم الحجز BK-0001. موعد المكالمة: الثلاثاء، 6 أكتوبر، 10:00 إلى 11:00 بتوقيت الرياض.';
+  const model = scriptedModel([toolCall('b', 'book', { ...ORDER, slot: SLOT, ...CUSTOMER }), say(text)]);
+  const out = await createChat({ desk, model }).respond([], 'احجز لي الثلاثاء الساعة 10');
+  assert.equal(out.reply, `${text}\n\nالسعر: 1575 ريال.`);
+  const priced = scriptedModel([toolCall('b', 'book', { ...ORDER, slot: SLOT, ...CUSTOMER }), say('Booked BK-0001 for 1575 SAR.')]);
+  const out2 = await createChat({ desk: fresh().desk, model: priced }).respond([], 'Book Tuesday 10:00');
+  assert.equal(out2.reply, 'Booked BK-0001 for 1575 SAR.\n\nYour call: Tuesday 6 October, 10:00 to 11:00 Riyadh time.');
+});

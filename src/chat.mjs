@@ -74,11 +74,15 @@ export function dropTeasers(text) {
 export function withConfirmation(reply, booking, arabic) {
   const { start, end } = booking.slot;
   const plain = toWestern(reply);
-  if (plain.includes(String(booking.price_quoted)) && plain.includes(start.slice(11, 16))) return reply;
+  const hasPrice = plain.includes(String(booking.price_quoted));
+  const hasSlot = plain.includes(start.slice(11, 16));
+  if (hasPrice && hasSlot) return reply;
   const { label_en, label_ar } = slotLabels(start, end, AV);
-  const line = arabic ? `الموعد: ${label_ar}. السعر: ${booking.price_quoted} ريال.`
-    : `Your call: ${label_en}. Price: ${booking.price_quoted} SAR.`;
-  return `${reply.replace(/\s+$/, '')}\n\n${line}`;
+  // Add only what is missing, so the customer is not told the same thing twice.
+  const parts = arabic
+    ? [hasSlot ? '' : `الموعد: ${label_ar}.`, hasPrice ? '' : `السعر: ${booking.price_quoted} ريال.`]
+    : [hasSlot ? '' : `Your call: ${label_en}.`, hasPrice ? '' : `Price: ${booking.price_quoted} SAR.`];
+  return `${reply.replace(/\s+$/, '')}\n\n${parts.filter(Boolean).join(' ')}`;
 }
 
 const failure = (code, message) => ({ ok: false, demo: true, error: { code, message } });
