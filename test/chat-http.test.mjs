@@ -10,7 +10,7 @@ import { PROFILES } from './profiles.mjs';
 const at = (iso) => () => new Date(iso);
 const NOW = '2026-10-04T08:00:00+03:00';
 const SLOT = '2026-10-06T10:00:00+03:00';
-const ORDER = PROFILES[1].input;
+const ORDER = PROFILES[1].order;
 
 function scriptedModel(rounds) {
   const seen = [];

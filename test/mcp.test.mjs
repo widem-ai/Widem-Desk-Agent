@@ -60,7 +60,7 @@ test('list_services over HTTP returns exactly the core result', async () => {
 
 for (const p of PROFILES) {
   test(`quote over HTTP equals the core: ${p.name}`, async () => {
-    const result = await call('quote', p.input);
+    const result = await call('quote', p.order);
     assert.ok(!result.isError);
     assert.deepEqual(parse(result), quote(p.input));
     assert.equal(parse(result).total, p.total);
@@ -69,12 +69,12 @@ for (const p of PROFILES) {
 
 // Changed in slice 2 on purpose: an unpriceable request now also carries the automatic handover.
 test('a refused quote over HTTP carries the core refusal and an automatic handover from the agent door', async () => {
-  const input = { services: ['salary_negotiation'], tier: 'senior' };
+  const input = { services: ['salary_negotiation'], years_experience: 10 };
   const before = store.all('handovers').length;
   const result = await call('quote', input);
   assert.equal(result.isError, true);
   const body = parse(result);
-  assert.deepEqual(body.error, quote(input).error);
+  assert.deepEqual(body.error, quote({ ...input, tier: 'senior' }).error); // the desk works out senior from 10 years
   assert.equal(body.handover.reason, 'unknown_service');
   const stored = store.all('handovers');
   assert.equal(stored.length, before + 1);
@@ -96,7 +96,7 @@ test('check_availability over HTTP equals the core for the same input', async ()
 test('book over HTTP records an agent booking at the quoted price and refuses the same slot twice', async () => {
   const slot = (await call('check_availability', { from: '2026-10-06', days: 1 })).content[0].text;
   const first = JSON.parse(slot).slots[0].start;
-  const args = { ...PROFILES[3].input, slot: first, customer_name: 'Test Agent Customer', contact: 'agent@example.com' };
+  const args = { ...PROFILES[3].order, slot: first, customer_name: 'Test Agent Customer', contact: 'agent@example.com' };
   const result = await call('book', args);
   assert.ok(!result.isError, result.content[0].text);
   const { booking } = parse(result);
@@ -126,7 +126,7 @@ test('bookings and handovers made through the door survive a server restart (fil
   const file = join(dir, 'store.json');
   try {
     const slot = '2026-10-07T15:00:00+03:00';
-    const args = { ...PROFILES[0].input, slot, customer_name: 'Restart Test', contact: 'restart@example.com' };
+    const args = { ...PROFILES[0].order, slot, customer_name: 'Restart Test', contact: 'restart@example.com' };
     const first = await openDoor(createDesk({ store: createFileStore(file), now: at(NOW) }));
     try {
       assert.ok(!(await first.client.callTool({ name: 'book', arguments: args })).isError);
@@ -159,6 +159,6 @@ test('a malformed body gets a 400, not a crash', async () => {
   });
   assert.equal(res.status, 400);
   // the server is still up afterwards
-  const again = await call('quote', PROFILES[0].input);
+  const again = await call('quote', PROFILES[0].order);
   assert.equal(parse(again).total, PROFILES[0].total);
 });

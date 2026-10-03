@@ -1,7 +1,7 @@
 // The stateful half of the core: availability, booking and handover over a store (src/store.mjs).
 // Every door calls these and nothing else. The clock is injected so the rules stay testable;
 // all times are computed in the business's timezone from the rules file, never the server's.
-import { quote as priceOrder, RULES } from './core.mjs';
+import { quote as priceOrder, tierFor, RULES } from './core.mjs';
 
 const AV = RULES.availability;
 const HO = RULES.handover;
@@ -110,12 +110,23 @@ export function createDesk({ store, now = () => new Date() }) {
     return { id: record.id, reason, tell_customer_en: HO.tell_customer_en, tell_customer_ar: HO.tell_customer_ar };
   }
 
+  /** Price an order from what the customer said: the tier is worked out here, never taken as given. */
+  function priceFromFacts(input) {
+    const tier = tierFor(input ?? {});
+    if (!tier) {
+      return refuse('needs_experience', 'Ask the customer how many years of work experience they have, and whether '
+        + 'they are an executive, director or general manager.');
+    }
+    return priceOrder({ ...input, tier });
+  }
+
   /** A refusal the rules cannot price goes to a person automatically: decided here in code, not by a model. */
   function withAutoHandover(refusal, input, ctx) {
     if (!HO.refusal_codes.includes(refusal.error.code)) return refusal;
     const strs = (a) => (Array.isArray(a) ? a.slice(0, 20).map((x) => String(x).slice(0, 80)) : []);
     const handover = recordHandover({ ...input, reason: refusal.error.code, summary: refusal.error.message }, ctx, {
-      request: { services: strs(input?.services), tier: cap(input?.tier, 80), addons: strs(input?.addons) },
+      request: { services: strs(input?.services), years_experience: Number.isFinite(input?.years_experience) ? input.years_experience : null,
+        is_executive: input?.is_executive === true, addons: strs(input?.addons) },
     });
     return { ...refusal, handover };
   }
@@ -143,12 +154,12 @@ export function createDesk({ store, now = () => new Date() }) {
     /** The slice 1 quote; a refusal the rules cannot price is handed over automatically. */
     quote(input, ctx) {
       door(ctx);
-      const q = priceOrder(input);
+      const q = priceFromFacts(input);
       return q.ok ? q : withAutoHandover(q, input, ctx);
     },
 
     /**
-     * Book a kickoff call. input: { services, tier, addons?, slot, customer_name, contact, transcript? }.
+     * Book a kickoff call. input: { services, years_experience, is_executive?, addons?, slot, customer_name, contact, transcript? }.
      * Checks the details, prices the order with the same quote, then checks the slot is open and free.
      */
     book(input, ctx) {
@@ -156,7 +167,7 @@ export function createDesk({ store, now = () => new Date() }) {
       const missing = ['customer_name', 'contact', 'slot'].filter((k) => !cap(input?.[k], 10_000));
       if (missing.length) return refuse('incomplete', `Missing: ${missing.join(', ')}.`);
 
-      const q = priceOrder(input);
+      const q = priceFromFacts(input);
       if (!q.ok) return withAutoHandover(q, input, ctx);
 
       const slot = input.slot.trim();

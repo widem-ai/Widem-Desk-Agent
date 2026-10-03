@@ -9,10 +9,10 @@
   },
   "currency": "SAR",
   "tiers": [
-    { "id": "junior", "name_en": "Graduate or junior (0 to 3 years)", "name_ar": "خريج أو مبتدئ (من 0 إلى 3 سنوات)" },
-    { "id": "mid", "name_en": "Mid-level (3 to 8 years)", "name_ar": "مستوى متوسط (من 3 إلى 8 سنوات)" },
-    { "id": "senior", "name_en": "Senior or manager (8+ years)", "name_ar": "خبير أو مدير (أكثر من 8 سنوات)" },
-    { "id": "executive", "name_en": "Executive or director", "name_ar": "تنفيذي أو مدير عام" }
+    { "id": "junior", "min_years": 0, "name_en": "Graduate or junior (0 to 3 years)", "name_ar": "خريج أو مبتدئ (من 0 إلى 3 سنوات)" },
+    { "id": "mid", "min_years": 3, "name_en": "Mid-level (3 to 8 years)", "name_ar": "مستوى متوسط (من 3 إلى 8 سنوات)" },
+    { "id": "senior", "min_years": 8, "name_en": "Senior or manager (8+ years)", "name_ar": "خبير أو مدير (أكثر من 8 سنوات)" },
+    { "id": "executive", "executive": true, "name_en": "Executive or director", "name_ar": "تنفيذي أو مدير عام" }
   ],
   "services": [
     {

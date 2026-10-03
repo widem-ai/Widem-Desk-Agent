@@ -55,7 +55,7 @@ test('nothing is offered beyond the 21-day booking window', () => {
 
 test('a booked slot is no longer offered', () => {
   const desk = newDesk();
-  const b = desk.book({ services: ['cv_rewrite'], tier: 'senior', slot: SUNDAY_STARTS[2],
+  const b = desk.book({ services: ['cv_rewrite'], years_experience: 10, slot: SUNDAY_STARTS[2],
     customer_name: 'Test Customer', contact: 'test@example.com' }, { door: 'agent' });
   assert.equal(b.ok, true);
   const starts = desk.checkAvailability({ from: '2026-10-04', days: 1 }).slots.map((s) => s.start);

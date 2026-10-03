@@ -17,6 +17,20 @@ function deepFreeze(o) {
 
 const clone = (o) => JSON.parse(JSON.stringify(o));
 
+/**
+ * The tier for what a customer says: executive when is_executive is true, otherwise the highest tier whose
+ * min_years the years of experience reach. The bounds come from the data file. Null when years is unusable.
+ */
+export function tierFor({ years_experience: years, is_executive: executive } = {}) {
+  if (executive === true) return DATA.tiers.find((t) => t.executive).id;
+  if (typeof years !== 'number' || !Number.isFinite(years) || years < 0) return null;
+  let best = null;
+  for (const t of DATA.tiers) {
+    if (!t.executive && years >= t.min_years && (!best || t.min_years > best.min_years)) best = t;
+  }
+  return best ? best.id : null;
+}
+
 /** The whole public offer: services with a price per tier, bundles and add-ons, in both languages. */
 export function listServices() {
   const { demo, notice_en, notice_ar, business, currency, tiers, services, bundles, addons } = DATA;

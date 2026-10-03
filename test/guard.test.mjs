@@ -10,7 +10,7 @@ import { PROFILES } from './profiles.mjs';
 
 const at = (iso) => () => new Date(iso);
 const NOW = '2026-10-04T08:00:00+03:00';
-const ORDER = PROFILES[1].input; // total 1575
+const ORDER = PROFILES[1].order; // total 1575
 
 function scriptedModel(rounds) {
   const seen = [];
@@ -94,9 +94,28 @@ test('an invented slot twice in a row never reaches the customer: it is handed t
 
 test('a quote refusal handed over through the chat keeps the transcript', async () => {
   const { desk, store } = fresh();
-  const model = scriptedModel([toolCall('q', 'quote', { services: ['tax_advice'], tier: 'senior' }), say('A person will reply.')]);
+  const model = scriptedModel([toolCall('q', 'quote', { services: ['tax_advice'], years_experience: 10 }), say('A person will reply.')]);
   await createChat({ desk, model }).respond([], 'I need tax advice');
   const [ho] = store.all('handovers');
   assert.equal(ho.reason, 'unknown_service');
   assert.match(ho.transcript, /tax advice/);
+});
+
+test('dashes and non-breaking hyphens in a reply are replaced with plain characters', async () => {
+  const { desk } = fresh();
+  const model = scriptedModel([toolCall('a', 'check_availability', { from: '2026-10-06', days: 1 }),
+    say('Free on 2026\u201110\u201106: 10:00 \u2013 11:00 or 14:00\u201415:00. Great \u2014 shall I book one?')]);
+  const out = await createChat({ desk, model }).respond([], 'When are you free?');
+  assert.equal(out.reply, 'Free on 2026-10-06: 10:00 to 11:00 or 14:00 to 15:00. Great, shall I book one?');
+  assert.ok(!JSON.stringify(out.history).match(/[\u2010-\u2015]/), 'the cleaned reply is what history keeps');
+});
+
+test('an Arabic range reads with a plain word, and the guard still checks the cleaned reply', async () => {
+  const { desk } = fresh();
+  const model = scriptedModel([toolCall('a', 'check_availability', { from: '2026-10-06', days: 1 }),
+    say('متاح من 10:00 \u2013 11:00'), say('متاح من 09:30 \u2013 10:30'), say('متاح من 09:30 \u2013 10:30')]);
+  const chat = createChat({ desk, model });
+  assert.equal((await chat.respond([], 'متى؟')).reply, 'متاح من 10:00 إلى 11:00');
+  const invented = await createChat({ desk, model: scriptedModel([say('متاح من 09:30 \u2013 10:30')]) }).respond([], 'متى؟');
+  assert.equal(invented.guarded, true);
 });

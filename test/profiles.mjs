@@ -14,3 +14,11 @@ export const PROFILES = [
     input: { services: ['linkedin_profile', 'interview_coaching'], tier: 'mid', addons: ['arabic_version'] },
     total: 1050, discount: 0 },
 ];
+
+// What each customer tells a door: facts, never a tier. The desk works the tier out (spec A3).
+const FACTS = [{ years_experience: 12 }, { years_experience: 10 }, { years_experience: 1 },
+  { years_experience: 20, is_executive: true }, { years_experience: 5 }];
+PROFILES.forEach((p, i) => {
+  const { tier, ...rest } = p.input;
+  p.order = { ...rest, ...FACTS[i] };
+});

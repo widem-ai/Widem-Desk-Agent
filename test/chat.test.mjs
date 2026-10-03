@@ -14,7 +14,7 @@ const at = (iso) => () => new Date(iso);
 const NOW = '2026-10-04T08:00:00+03:00'; // Sunday, before opening
 const SLOT = '2026-10-06T10:00:00+03:00'; // Tuesday, first slot of the day
 const CUSTOMER = { customer_name: 'سارة أحمد', contact: 'sara@example.com' };
-const ORDER = PROFILES[1].input; // full career pack, senior
+const ORDER = PROFILES[1].order; // full career pack, senior
 
 // A fake model that plays back one scripted assistant message per round and records what it was sent.
 function scriptedModel(rounds) {
@@ -82,11 +82,12 @@ test('wrong types, missing or extra fields go back to the model as bad_arguments
   const store = createMemoryStore();
   const desk = createDesk({ store, now: at(NOW) });
   const bad = [
-    { services: 'cv_rewrite', tier: 'senior' }, // string instead of array
-    { services: ['cv_rewrite'], tier: 7 }, // number instead of string
-    { services: ['cv_rewrite'] }, // tier missing
-    { services: ['cv_rewrite'], tier: 'senior', price: 1 }, // extra field
-    { services: [1], tier: 'senior' }, // array of numbers
+    { services: 'cv_rewrite', years_experience: 10 }, // string instead of array
+    { services: ['cv_rewrite'], years_experience: '10' }, // string instead of number
+    { services: ['cv_rewrite'], is_executive: true }, // years_experience missing
+    { services: ['cv_rewrite'], years_experience: 10, tier: 'junior' }, // a tier the model may not choose
+    { services: [1], years_experience: 10 }, // array of numbers
+    { services: ['cv_rewrite'], years_experience: 10, is_executive: 'yes' }, // string instead of boolean
   ];
   const calls = bad.map((args, i) => ({ id: `b${i}`, type: 'function', function: { name: 'quote', arguments: JSON.stringify(args) } }));
   calls.push({ id: 'b5', type: 'function', function: { name: 'book', arguments: JSON.stringify({ ...ORDER, slot: SLOT, ...CUSTOMER, transcript: 'forged' }) } });

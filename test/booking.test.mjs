@@ -13,7 +13,7 @@ const at = (iso) => () => new Date(iso);
 const NOW = '2026-10-04T08:00:00+03:00'; // Sunday, before opening
 const SLOT = '2026-10-05T11:00:00+03:00'; // Monday 11:00 Riyadh
 const newDesk = (store = createMemoryStore()) => ({ store, desk: createDesk({ store, now: at(NOW) }) });
-const order = (extra = {}) => ({ ...PROFILES[1].input, slot: SLOT,
+const order = (extra = {}) => ({ ...PROFILES[1].order, slot: SLOT,
   customer_name: 'Test Customer', contact: 'test@example.com', ...extra });
 
 test('book returns a reference and stores every field the owner needs', () => {
@@ -84,10 +84,9 @@ for (const [name, extra, code] of [
 
 // Decision for this slice: a refusal the rules cannot price goes to a person automatically, in code.
 for (const [name, input, code] of [
-  ['an unknown service', { services: ['salary_negotiation'], tier: 'senior' }, 'unknown_service'],
-  ['an unknown tier', { services: ['cv_rewrite'], tier: 'intern' }, 'unknown_tier'],
-  ['an unknown add-on', { services: ['cv_rewrite'], tier: 'mid', addons: ['gold_frame'] }, 'unknown_addon'],
-  ['an add-on that cannot apply', { services: ['interview_coaching'], tier: 'mid', addons: ['arabic_version'] },
+  ['an unknown service', { services: ['salary_negotiation'], years_experience: 10 }, 'unknown_service'],
+  ['an unknown add-on', { services: ['cv_rewrite'], years_experience: 5, addons: ['gold_frame'] }, 'unknown_addon'],
+  ['an add-on that cannot apply', { services: ['interview_coaching'], years_experience: 5, addons: ['arabic_version'] },
     'addon_not_applicable'],
 ]) {
   test(`${name} is handed over automatically, from quote and from book`, () => {
@@ -108,13 +107,13 @@ for (const [name, input, code] of [
     assert.equal(h2.door, 'human');
     assert.equal(h2.customer_name, 'Test Customer');
     assert.equal(h2.contact, 'test@example.com');
-    assert.deepEqual(h1.request, { services: input.services, tier: input.tier, addons: input.addons ?? [] });
+    assert.deepEqual(h1.request, { services: input.services, years_experience: input.years_experience, is_executive: false, addons: input.addons ?? [] });
   });
 }
 
 test('a quote inside the rules is the slice 1 quote and hands nothing over', () => {
   const { desk, store } = newDesk();
-  for (const p of PROFILES) assert.deepEqual(desk.quote(p.input, { door: 'agent' }), quote(p.input));
+  for (const p of PROFILES) assert.deepEqual(desk.quote(p.order, { door: 'agent' }), quote(p.input));
   assert.deepEqual(store.all('handovers'), []);
 });
 

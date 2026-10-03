@@ -16,14 +16,18 @@ export const TOOLS = [
   {
     name: 'quote',
     title: 'Quote a price',
-    description: 'Price an order for one customer. Pass the service ids from list_services, the customer tier '
-      + '(junior, mid, senior or executive, by years of experience) and any add-on ids. Returns an itemised '
+    description: 'Price an order for one customer. Pass the service ids from list_services, the customer\'s years of '
+      + 'experience, whether they are an executive, and any add-on ids. The desk works out the tier. Returns an itemised '
       + 'quote with bundle discounts applied, or a refusal with a reason code when the request is outside '
       + 'the rules. A request the rules cannot price is handed to a person automatically: the reply then '
       + 'includes a handover with what to tell the customer. Never invent a price: quote the total exactly as returned.',
     params: {
       services: { type: 'string[]', describe: 'Service ids, e.g. ["cv_rewrite", "linkedin_profile"]' },
-      tier: { type: 'string', describe: 'junior | mid | senior | executive' },
+      years_experience: { type: 'number', describe: 'Years of work experience the customer told you, e.g. 12. '
+        + 'Ask if you do not know. The desk works out the tier from it.' },
+      is_executive: { type: 'boolean', optional: true, describe: 'true only for an executive, director, general manager '
+        + 'or C-level role (in Arabic: تنفيذي، مدير تنفيذي، مدير عام). A manager (مدير) is not an executive: leave it '
+        + 'false. Ask rather than guess.' },
       addons: { type: 'string[]', optional: true, describe: 'Add-on ids, e.g. ["express"]' },
     },
     run: (desk, args, ctx) => desk.quote(args, ctx),
@@ -43,13 +47,17 @@ export const TOOLS = [
   {
     name: 'book',
     title: 'Book a kickoff call',
-    description: 'Book one customer into a free slot from check_availability. Pass the same services, tier and '
+    description: 'Book one customer into a free slot from check_availability. Pass the same services, experience and '
       + 'add-ons you quoted, the slot start exactly as returned, and the customer name and a contact (email or '
       + 'phone). The order is priced again by the same rules and the price is stored with the booking. Returns '
       + 'a booking reference, or a refusal with a reason code (slot_taken: pick another free slot).',
     params: {
       services: { type: 'string[]', describe: 'Service ids from list_services' },
-      tier: { type: 'string', describe: 'junior | mid | senior | executive' },
+      years_experience: { type: 'number', describe: 'Years of work experience the customer told you, e.g. 12. '
+        + 'Ask if you do not know. The desk works out the tier from it.' },
+      is_executive: { type: 'boolean', optional: true, describe: 'true only for an executive, director, general manager '
+        + 'or C-level role (in Arabic: تنفيذي، مدير تنفيذي، مدير عام). A manager (مدير) is not an executive: leave it '
+        + 'false. Ask rather than guess.' },
       addons: { type: 'string[]', optional: true, describe: 'Add-on ids, e.g. ["express"]' },
       slot: { type: 'string', describe: 'A slot start from check_availability, e.g. "2026-10-05T11:00:00+03:00"' },
       customer_name: { type: 'string', describe: "The customer's name" },
@@ -89,7 +97,8 @@ export function toJsonSchema(params) {
 export function toZodShape(params, z) {
   const shape = {};
   for (const [key, p] of Object.entries(params)) {
-    let s = p.type === 'string[]' ? z.array(z.string()) : p.type === 'number' ? z.number() : z.string();
+    let s = p.type === 'string[]' ? z.array(z.string()) : p.type === 'number' ? z.number()
+      : p.type === 'boolean' ? z.boolean() : z.string();
     if (p.optional) s = s.optional();
     shape[key] = s.describe(p.describe);
   }
@@ -100,6 +109,7 @@ const TYPE_CHECKS = {
   string: (v) => typeof v === 'string',
   number: (v) => typeof v === 'number' && Number.isFinite(v),
   'string[]': (v) => Array.isArray(v) && v.every((x) => typeof x === 'string'),
+  boolean: (v) => typeof v === 'boolean',
 };
 
 /** Check arguments against a tool's parameters: a plain object, no unknown fields, required present, right types.

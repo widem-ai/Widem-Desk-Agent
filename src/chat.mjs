@@ -42,6 +42,17 @@ export const transcriptOf = (messages) => messages
   .map((m) => `${m.role === 'user' ? 'Customer' : 'Desk'}: ${m.content.trim()}`)
   .join('\n');
 
+/** Plain characters for the customer: a dash between two numbers or times becomes "to" (or "إلى"), any other
+ * spaced dash a comma, and any remaining dash or non-breaking hyphen a plain hyphen. */
+export function plainDashes(text) {
+  if (typeof text !== 'string') return text;
+  const to = ARABIC.test(text) ? ' إلى ' : ' to ';
+  return text
+    .replace(/(\d)\s*[\u2012-\u2015]\s*(?=\d)/g, `$1${to}`)
+    .replace(/\s+[\u2012-\u2015]\s+/g, ', ')
+    .replace(/[\u2010-\u2015]/g, '-');
+}
+
 const failure = (code, message) => ({ ok: false, demo: true, error: { code, message } });
 
 function runTool(desk, call, messages) {
@@ -84,7 +95,8 @@ export function createChat({ desk, model, maxRounds = 6 }) {
       for (let round = 0; round < maxRounds; round += 1) {
         const out = await model.complete({ messages, tools: CHAT_TOOLS });
         modelId = out.modelId;
-        const message = out.message;
+        // Tool calls go back as they came; a text reply is cleaned before the guard and the customer see it.
+        const message = out.message.tool_calls?.length ? out.message : { ...out.message, content: plainDashes(out.message.content) };
         messages.push(message);
         if (!message.tool_calls?.length) {
           // Every SAR amount and time in the reply must be one a desk tool returned in this session.
