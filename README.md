@@ -2,7 +2,7 @@
 
 One brain, two doors. A service desk for a client-services business that answers customers in Arabic and English, prices their order correctly and books them, whether the customer types to it directly or sends their own AI agent.
 
-- **The human door:** a chat page on the business's site. (Planned, not built yet.)
+- **The human door:** a chat on the business's site. (The chat endpoint is built; the page is not yet.)
 - **The agent door:** a remote MCP server that Claude, ChatGPT or any MCP client can connect to.
 
 Both doors call the same core, so a person and an agent asking for the same thing get the same quote.
@@ -11,7 +11,7 @@ Both doors call the same core, so a person and an agent asking for the same thin
 
 ## Status
 
-Built so far: the core (prices, free slots, bookings and handover to a person) and the agent door with all five tools. The chat page and the owner page come next.
+Built so far: the core (prices, free slots, bookings and handover to a person) the agent door with all five tools, and the chat endpoint for people (POST /chat, Nemotron calling the same tools). The chat page and the owner page come next.
 
 | Tool | What it does |
 |---|---|
@@ -35,9 +35,12 @@ Needs Node.js 22 or newer.
 npm install
 npm test        # unit tests for the core, plus a real MCP client over HTTP
 npm start       # agent door on http://127.0.0.1:8790/mcp
+node --env-file=.env src/mcp-server.mjs   # both doors: /mcp, and the chat at /chat
 ```
 
-`PORT` and `HOST` change where it listens. Bookings and handovers are kept in `var/desk-store.json` (not committed); `DESK_STORE` points it at another file. To try it by hand, run `npx @modelcontextprotocol/inspector`, choose Streamable HTTP and connect to `http://127.0.0.1:8790/mcp`.
+`PORT` and `HOST` change where it listens. Bookings and handovers are kept in `var/desk-store.json` (not committed); `DESK_STORE` points it at another file. The chat door (`POST /chat` with JSON `{ "sessionId": "...", "message": "..." }`, answers `{ reply, booked?, handover? }`) needs a Nebius Token Factory key: copy `.env.example` to `.env` and set `NEBIUS_API_KEY` and `NEBIUS_BASE_URL`. Without them the server still runs and `/chat` answers 503. Every SAR amount and time in a chat reply is checked against what the desk tools returned; a reply that states one they did not is re-asked once, then handed to a person. `node --env-file=.env smoke/chat-live-http.mjs` runs one Arabic conversation through the real model on a memory store.
+
+To try the agent door by hand, run `npx @modelcontextprotocol/inspector`, choose Streamable HTTP and connect to `http://127.0.0.1:8790/mcp`.
 
 ## Layout
 
@@ -47,8 +50,9 @@ src/core.mjs              the one brain, pricing: pure, deterministic listServic
 src/desk.mjs              the one brain, state: checkAvailability(), book(), handover()
 src/store.mjs             storage behind all(kind) and add(kind, record): memory or one JSON file
 src/tools.mjs             the five tools, defined once; both doors build their tool lists from here
-src/mcp-server.mjs        the agent door: MCP over Streamable HTTP, calls the core only
+src/mcp-server.mjs        the HTTP server: the agent door at /mcp (MCP, Streamable HTTP) and the chat at /chat
 src/chat.mjs              the human door brain: a Nemotron chat loop calling the same tools in-process
+src/guard.mjs             the check that no reply states a price or time the desk tools did not return
 test/                     core, availability and booking tests, the five scripted profiles, the MCP door test
 smoke/                    the day-1 smoke test (model tool calling and a first MCP server)
 ```
