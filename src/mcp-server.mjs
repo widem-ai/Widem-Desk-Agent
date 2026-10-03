@@ -1,6 +1,7 @@
 // The agent door: a remote MCP server (Streamable HTTP, stateless) for customers' AI agents.
 // Each tool calls the core and nothing else, so an agent gets exactly what a person would.
 import http from 'node:http';
+import { randomUUID } from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -53,48 +54,102 @@ async function readJson(req, fail) {
   try { return { value: JSON.parse(body) }; } catch { fail(400, 'Parse error: body is not JSON'); return { done: true }; }
 }
 
-const MAX_SESSIONS = 500;
+/** Limits on the human door, in one place (acceptance A7: the model credit is protected). */
+export const CHAT_LIMITS = {
+  perIp: { messages: 20, windowMs: 10 * 60_000 }, // one customer
+  global: { messages: 60, windowMs: 60_000 }, // everyone together
+  newSessionsPerIp: { count: 5, windowMs: 10 * 60_000 }, // so a flood cannot push real sessions out
+  maxSessions: 500, // past this the least recently used session is dropped
+  maxHistoryMessages: 40, // per session; the oldest turns are trimmed (the system prompt is added fresh each turn)
+};
 const MAX_MESSAGE_CHARS = 4000;
+const BUSY_REPLY = 'Too many messages for now. Please try again in a few minutes.\n'
+  + 'عدد الرسائل كبير الآن. يرجى المحاولة مرة أخرى بعد بضع دقائق.';
 
-/** The human door over HTTP: POST /chat { sessionId, message } -> { reply, booked?, handover? }.
- * Each session's history is kept in memory (lost on restart; the oldest session goes past MAX_SESSIONS). */
-function createChatRoute(desk, model) {
+/** Token buckets by key: each holds up to size tokens and refills size per windowMs, continuously. */
+function createBuckets(size, windowMs, now) {
+  const buckets = new Map();
+  return {
+    /** Take one token for key: 0 when allowed, otherwise the seconds until one is free. */
+    take(key) {
+      const t = now();
+      const b = buckets.get(key) ?? { tokens: size, at: t };
+      b.tokens = Math.min(size, b.tokens + ((t - b.at) * size) / windowMs);
+      b.at = t;
+      buckets.delete(key);
+      buckets.set(key, b);
+      if (buckets.size > 10_000) buckets.delete(buckets.keys().next().value);
+      if (b.tokens >= 1) { b.tokens -= 1; return 0; }
+      return Math.max(1, Math.ceil(((1 - b.tokens) * windowMs) / size / 1000));
+    },
+  };
+}
+
+/** Keep the newest messages, starting at a customer message so no tool result loses its call. */
+function trimHistory(history, max) {
+  if (history.length <= max) return history;
+  const kept = history.slice(-max);
+  const first = kept.findIndex((m) => m.role === 'user');
+  return first === -1 ? [] : kept.slice(first);
+}
+
+/** The human door over HTTP: POST /chat { sessionId?, message } -> { sessionId, reply, booked?, handover? }.
+ * The server issues session ids (send none to start); an id it did not issue gets a 400, never another
+ * session's history. History lives in memory and is lost on restart. */
+function createChatRoute(desk, model, limits, now) {
   const chat = model ? createChat({ desk, model }) : null;
   const sessions = new Map();
+  const perIp = createBuckets(limits.perIp.messages, limits.perIp.windowMs, now);
+  const global = createBuckets(limits.global.messages, limits.global.windowMs, now);
+  const newSessions = createBuckets(limits.newSessionsPerIp.count, limits.newSessionsPerIp.windowMs, now);
   return async (req, res) => {
     const fail = (status, message, code = 'bad_request') => send(res, status, { error: { code, message } });
     if (req.method !== 'POST') { fail(405, 'Use POST', 'method_not_allowed'); return; }
     const body = await readJson(req, fail);
     if (body.done) return;
     const { sessionId, message } = body.value ?? {};
-    if (typeof sessionId !== 'string' || !sessionId.trim() || sessionId.length > 100
+    if ((sessionId !== undefined && (typeof sessionId !== 'string' || sessionId.length > 100))
       || typeof message !== 'string' || !message.trim() || message.length > MAX_MESSAGE_CHARS) {
-      fail(400, `Send { sessionId, message } as strings (sessionId up to 100, message up to ${MAX_MESSAGE_CHARS} characters).`);
+      fail(400, `Send { message } (up to ${MAX_MESSAGE_CHARS} characters) and, after the first reply, the sessionId it gave you.`);
+      return;
+    }
+    if (sessionId !== undefined && !sessions.has(sessionId)) {
+      fail(400, 'This chat has ended. Send the message without a sessionId to start a new one.', 'unknown_session');
       return;
     }
     if (!chat) { send(res, 503, { error: { code: 'chat_not_configured' }, reply: sorryReply(message) }); return; }
+    const ip = req.socket.remoteAddress ?? 'unknown';
+    const wait = perIp.take(ip) || (sessionId === undefined && newSessions.take(ip)) || global.take('all');
+    if (wait) {
+      res.setHeader('retry-after', String(wait));
+      send(res, 429, { error: { code: 'rate_limited' }, reply: BUSY_REPLY });
+      return;
+    }
+    const id = sessionId ?? randomUUID();
     let out;
     try {
-      out = await chat.respond(sessions.get(sessionId) ?? [], message);
+      out = await chat.respond(sessions.get(id) ?? [], message);
     } catch (err) {
       const code = err?.code === 'model_timeout' ? 'model_timeout' : 'model_error';
       console.error('chat turn failed:', code, err?.message);
       send(res, 503, { error: { code }, reply: sorryReply(message) }); // the failed turn is not kept
       return;
     }
-    sessions.delete(sessionId);
-    sessions.set(sessionId, out.history);
-    if (sessions.size > MAX_SESSIONS) sessions.delete(sessions.keys().next().value);
-    const booked = out.toolCalls.findLast((c) => c.name === 'book' && c.result?.ok)?.result.booking;
+    sessions.delete(id);
+    sessions.set(id, trimHistory(out.history, limits.maxHistoryMessages));
+    if (sessions.size > limits.maxSessions) sessions.delete(sessions.keys().next().value);
+    const booked = out.booked ?? out.toolCalls.findLast((c) => c.name === 'book' && c.result?.ok)?.result.booking;
     const handover = out.handover ?? out.toolCalls.findLast((c) => c.result?.handover)?.result.handover;
-    send(res, 200, { reply: out.reply.replace(/^(\s*\n)+/, ''), ...(booked ? { booked } : {}), ...(handover ? { handover } : {}) });
+    send(res, 200, { sessionId: id, reply: out.reply.replace(/^(\s*\n)+/, ''),
+      ...(booked ? { booked } : {}), ...(handover ? { handover } : {}) });
   };
 }
 
 /** Both doors over one desk: the agent door at /mcp and, when a model is given, the human door at /chat.
  * Without a desk it runs on a memory store (nothing is kept). */
-export function createHttpServer({ desk = createDesk({ store: createMemoryStore() }), model } = {}) {
-  const chatRoute = createChatRoute(desk, model);
+export function createHttpServer({ desk = createDesk({ store: createMemoryStore() }), model, limits = CHAT_LIMITS,
+  now = Date.now } = {}) {
+  const chatRoute = createChatRoute(desk, model, limits, now);
   return http.createServer(async (req, res) => {
     const path = new URL(req.url, 'http://x').pathname;
     if (path === '/chat') {

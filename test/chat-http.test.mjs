@@ -1,7 +1,9 @@
 // The human door over HTTP: POST /chat on the same server as the agent door, with a scripted
-// fake model (no network). The server keeps each session's history in memory.
+// fake model (no network) and a fake clock (no real waiting). The server issues session ids and
+// keeps each session's history in memory; per-IP and global limits protect the model credit.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { createHttpServer } from '../src/mcp-server.mjs';
 import { createDesk } from '../src/desk.mjs';
 import { createMemoryStore } from '../src/store.mjs';
@@ -11,6 +13,7 @@ const at = (iso) => () => new Date(iso);
 const NOW = '2026-10-04T08:00:00+03:00';
 const SLOT = '2026-10-06T10:00:00+03:00';
 const ORDER = PROFILES[1].order;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 function scriptedModel(rounds) {
   const seen = [];
@@ -27,57 +30,80 @@ function scriptedModel(rounds) {
 const toolCall = (id, name, args) => ({ role: 'assistant', content: null,
   tool_calls: [{ id, type: 'function', function: { name, arguments: JSON.stringify(args) } }] });
 
-async function withServer(model, fn) {
+async function withServer(model, fn, { limits, clock = { t: 0 } } = {}) {
   const store = createMemoryStore();
-  const server = createHttpServer({ desk: createDesk({ store, now: at(NOW) }), model });
+  const server = createHttpServer({ desk: createDesk({ store, now: at(NOW) }), model, limits, now: () => clock.t });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const url = `http://127.0.0.1:${server.address().port}/chat`;
   const post = async (body) => {
     const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' },
       body: typeof body === 'string' ? body : JSON.stringify(body) });
-    return { status: res.status, json: await res.json().catch(() => null) };
+    return { status: res.status, headers: res.headers, json: await res.json().catch(() => null) };
   };
-  try { await fn({ post, store, url }); } finally { await new Promise((resolve) => server.close(resolve)); }
+  // A customer: the first message opens a session, the rest send back the id the server issued.
+  const customer = () => {
+    let sessionId;
+    return async (message) => {
+      const out = await post(sessionId ? { sessionId, message } : { message });
+      if (out.json?.sessionId) sessionId = out.json.sessionId;
+      return out;
+    };
+  };
+  try { await fn({ post, customer, store, url, clock }); } finally { await new Promise((resolve) => server.close(resolve)); }
 }
 
-test('POST /chat keeps a session, books with door human and stores the conversation', async () => {
+test('the server issues the session id; a booking keeps the facts and the whole turn, confirmation included', async () => {
   const model = scriptedModel([
     { role: 'assistant', content: '\n\nWhat is your name and email?' },
     toolCall('c1', 'book', { ...ORDER, slot: SLOT, customer_name: 'Sara', contact: 'sara@example.com' }),
     { role: 'assistant', content: 'Booked: BK-0001.' },
   ]);
-  await withServer(model, async ({ post, store }) => {
-    const first = await post({ sessionId: 's1', message: 'Full career pack, senior, Tuesday 10:00 please' });
+  await withServer(model, async ({ customer, store }) => {
+    const say = customer();
+    const first = await say('Full career pack, 10 years, Tuesday 10:00 please');
     assert.equal(first.status, 200);
+    assert.match(first.json.sessionId, UUID);
     assert.equal(first.json.reply, 'What is your name and email?'); // leading blank lines stripped
     assert.equal(first.json.booked, undefined);
 
-    const second = await post({ sessionId: 's1', message: 'Sara, sara@example.com' });
+    const second = await say('Sara, sara@example.com');
     assert.equal(second.status, 200);
+    assert.equal(second.json.sessionId, first.json.sessionId);
     assert.equal(second.json.reply, 'Booked: BK-0001.');
-    assert.deepEqual(second.json.booked, store.all('bookings')[0]);
-    assert.equal(second.json.booked.door, 'human');
-    assert.equal(second.json.booked.price_quoted, PROFILES[1].total);
-    // The second turn's model call saw the first turn, and the booking keeps both customer messages.
+    const [stored] = store.all('bookings');
+    assert.deepEqual(second.json.booked, stored);
+    assert.equal(stored.door, 'human');
+    assert.equal(stored.price_quoted, PROFILES[1].total);
+    assert.equal(stored.years_experience, 10);
+    assert.equal(stored.is_executive, false);
     assert.ok(model.seen[1].some((m) => m.role === 'user' && /Full career pack/.test(m.content)));
-    assert.match(second.json.booked.transcript, /Full career pack[\s\S]*What is your name[\s\S]*sara@example.com/);
+    // The stored conversation runs to the end of the turn, so the owner sees the confirmation too.
+    assert.match(stored.transcript, /Full career pack[\s\S]*What is your name[\s\S]*sara@example.com[\s\S]*Desk: Booked: BK-0001\.$/);
   });
 });
 
-test('separate sessions do not share history', async () => {
+test('a made-up or guessed session id cannot read or continue another session', async () => {
   const model = scriptedModel([{ role: 'assistant', content: 'Hello.' }]);
-  await withServer(model, async ({ post }) => {
-    await post({ sessionId: 'a', message: 'secret from a' });
-    await post({ sessionId: 'b', message: 'hi from b' });
-    assert.ok(!model.seen[1].some((m) => /secret from a/.test(m.content ?? '')));
+  await withServer(model, async ({ post, customer }) => {
+    const real = customer();
+    const opened = await real('my secret order');
+    for (const sessionId of ['s1', 'a', randomUUID(), opened.json.sessionId.replace(/.$/, (c) => (c === '0' ? '1' : '0'))]) {
+      const out = await post({ sessionId, message: 'what did I say?' });
+      assert.equal(out.status, 400, sessionId);
+      assert.equal(out.json.error.code, 'unknown_session');
+    }
+    assert.equal(model.seen.length, 1, 'no guessed id reached the model');
+    const fresh = await post({ message: 'hi' });
+    assert.notEqual(fresh.json.sessionId, opened.json.sessionId);
+    assert.ok(!model.seen[1].some((m) => /my secret order/.test(m.content ?? '')));
   });
 });
 
 test('a handover through the chat is returned and keeps the conversation', async () => {
   const model = scriptedModel([toolCall('h1', 'handover', { reason: 'out_of_rules', summary: 'Wants a discount' }),
     { role: 'assistant', content: 'A person will reply.' }]);
-  await withServer(model, async ({ post, store }) => {
-    const out = await post({ sessionId: 'h', message: 'Can I get 50% off?' });
+  await withServer(model, async ({ customer, store }) => {
+    const out = await customer()('Can I get 50% off?');
     assert.equal(out.status, 200);
     const [record] = store.all('handovers');
     assert.equal(out.json.handover.id, record.id); // the reply carries what to tell the customer, not the record
@@ -91,10 +117,10 @@ test('malformed, incomplete or oversized bodies get a 4xx and never reach the mo
   const model = scriptedModel([{ role: 'assistant', content: 'never' }]);
   await withServer(model, async ({ post, url }) => {
     assert.equal((await post('{not json')).status, 400);
-    assert.equal((await post({ sessionId: 's' })).status, 400);
-    assert.equal((await post({ message: 'hi' })).status, 400);
-    assert.equal((await post({ sessionId: 's', message: 42 })).status, 400);
-    assert.equal((await post({ sessionId: 's', message: 'x'.repeat(70 * 1024) })).status, 413);
+    assert.equal((await post({})).status, 400);
+    assert.equal((await post({ message: 42 })).status, 400);
+    assert.equal((await post({ sessionId: 7, message: 'hi' })).status, 400);
+    assert.equal((await post({ message: 'x'.repeat(70 * 1024) })).status, 413);
     assert.equal((await fetch(url)).status, 405);
     assert.equal(model.seen.length, 0);
   });
@@ -103,12 +129,73 @@ test('malformed, incomplete or oversized bodies get a 4xx and never reach the mo
 test('a model timeout becomes a polite 503 reply in the customer language, and the turn is not kept', async () => {
   const slow = Object.assign(new Error('model timed out'), { code: 'model_timeout' });
   const model = scriptedModel([slow, { role: 'assistant', content: 'Back.' }]);
-  await withServer(model, async ({ post }) => {
-    const out = await post({ sessionId: 't', message: 'مرحبا' });
+  await withServer(model, async ({ customer }) => {
+    const say = customer();
+    const out = await say('مرحبا');
     assert.equal(out.status, 503);
     assert.equal(out.json.error.code, 'model_timeout');
     assert.match(out.json.reply, /[؀-ۿ]/);
-    await post({ sessionId: 't', message: 'hello again' });
+    await say('hello again');
     assert.equal(model.seen[1].filter((m) => m.role === 'user').length, 1);
   });
+});
+
+const LIMITS = { perIp: { messages: 3, windowMs: 600_000 }, global: { messages: 100, windowMs: 60_000 },
+  newSessionsPerIp: { count: 5, windowMs: 600_000 }, maxSessions: 500, maxHistoryMessages: 40 };
+
+test('per-IP limit: the fourth message in ten minutes gets a polite bilingual 429, and the bucket refills', async () => {
+  const model = scriptedModel([{ role: 'assistant', content: 'ok' }]);
+  await withServer(model, async ({ customer, clock }) => {
+    const say = customer();
+    for (let i = 0; i < 3; i += 1) assert.equal((await say(`m${i}`)).status, 200);
+    const limited = await say('one more');
+    assert.equal(limited.status, 429);
+    assert.equal(limited.json.error.code, 'rate_limited');
+    assert.match(limited.json.reply, /try again/i);
+    assert.match(limited.json.reply, /[؀-ۿ]/);
+    assert.ok(Number(limited.headers.get('retry-after')) > 0);
+    assert.equal(model.seen.length, 3);
+    clock.t += 600_000;
+    assert.equal((await say('after the wait')).status, 200);
+  }, { limits: LIMITS });
+});
+
+test('global limit per minute protects the model credit across all callers', async () => {
+  const model = scriptedModel([{ role: 'assistant', content: 'ok' }]);
+  const limits = { ...LIMITS, perIp: { messages: 100, windowMs: 600_000 }, global: { messages: 2, windowMs: 60_000 } };
+  await withServer(model, async ({ customer }) => {
+    assert.equal((await customer()('a')).status, 200);
+    assert.equal((await customer()('b')).status, 200);
+    const out = await customer()('c');
+    assert.equal(out.status, 429);
+    assert.equal(model.seen.length, 2);
+  }, { limits });
+});
+
+test('one IP cannot flood new sessions and push real ones out', async () => {
+  const model = scriptedModel([{ role: 'assistant', content: 'ok' }]);
+  const limits = { ...LIMITS, perIp: { messages: 100, windowMs: 600_000 }, newSessionsPerIp: { count: 2, windowMs: 600_000 }, maxSessions: 3 };
+  await withServer(model, async ({ customer }) => {
+    const real = customer();
+    assert.equal((await real('I am real')).status, 200);
+    const flood = [];
+    for (let i = 0; i < 10; i += 1) flood.push((await customer()(`flood ${i}`)).status);
+    assert.equal(flood.filter((s) => s === 200).length, 1);
+    assert.equal(flood.filter((s) => s === 429).length, 9);
+    assert.equal((await real('still here')).status, 200);
+  }, { limits });
+});
+
+test('history is capped: the oldest turns are trimmed, starting at a customer message', async () => {
+  const model = scriptedModel([toolCall('q', 'quote', ORDER), { role: 'assistant', content: 'ok' }]);
+  const limits = { ...LIMITS, perIp: { messages: 100, windowMs: 600_000 }, maxHistoryMessages: 3 }; // odd, so a plain cut lands mid-turn
+  await withServer(model, async ({ customer }) => {
+    const say = customer();
+    for (let i = 1; i <= 5; i += 1) assert.equal((await say(`message ${i}`)).status, 200);
+    const last = model.seen.at(-1);
+    assert.equal(last[0].role, 'system');
+    assert.ok(last.length <= 1 + 3 + 1, `sent ${last.length} messages`);
+    assert.equal(last[1].role, 'user');
+    assert.ok(!last.some((m) => m.content === 'message 1'));
+  }, { limits });
 });

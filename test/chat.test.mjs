@@ -67,7 +67,9 @@ test('an Arabic booking through the chat equals the agent door booking, apart fr
   assert.deepEqual(toolMessages.map((m) => m.tool_call_id), ['c1', 'c2']);
   assert.deepEqual(JSON.parse(toolMessages[0].content), desk.quote(ORDER, { door: 'human' }));
   assert.equal(JSON.parse(toolMessages[0].content).total, PROFILES[1].total);
-  assert.deepEqual(JSON.parse(toolMessages[1].content).booking, store.all('bookings')[0]);
+  // The stored transcript is brought up to the end of the turn afterwards; everything else is what the model saw.
+  assert.deepEqual({ ...JSON.parse(toolMessages[1].content).booking, transcript: 'x' }, { ...store.all('bookings')[0], transcript: 'x' });
+  assert.match(store.all('bookings')[0].transcript, /Desk: تم الحجز/);
 
   const human = store.all('bookings');
   assert.equal(human.length, 1);

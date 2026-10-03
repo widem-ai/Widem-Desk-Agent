@@ -30,6 +30,8 @@ test('book returns a reference and stores every field the owner needs', () => {
   assert.equal(b.customer_name, 'Test Customer');
   assert.equal(b.contact, 'test@example.com');
   assert.equal(b.tier, 'senior');
+  assert.equal(b.years_experience, 10);
+  assert.equal(b.is_executive, false);
   assert.deepEqual(b.services, PROFILES[1].input.services);
   assert.equal(b.price_quoted, PROFILES[1].total);
   assert.equal(b.currency, 'SAR');
@@ -180,4 +182,21 @@ test('a corrupt store file stops the desk instead of silently starting empty', (
 test('an unknown door is a programming error, not a customer refusal', () => {
   const { desk } = newDesk();
   assert.throws(() => desk.book(order(), { door: 'fax' }), /door/);
+});
+
+test('update changes one stored record by key and survives a reopen of the file store', async () => {
+  const { mkdtempSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { createFileStore } = await import('../src/store.mjs');
+  const dir = mkdtempSync(join(tmpdir(), 'desk-update-'));
+  try {
+    const file = join(dir, 'store.json');
+    const a = createFileStore(file);
+    a.add('bookings', { reference: 'BK-0001', transcript: 'old' });
+    a.add('bookings', { reference: 'BK-0002', transcript: 'other' });
+    assert.deepEqual(a.update('bookings', 'reference', 'BK-0001', { transcript: 'new' }), { reference: 'BK-0001', transcript: 'new' });
+    assert.equal(a.update('bookings', 'reference', 'BK-9999', { transcript: 'x' }), null);
+    assert.deepEqual(createFileStore(file).all('bookings').map((b) => b.transcript), ['new', 'other']);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

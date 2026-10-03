@@ -85,12 +85,21 @@ export function createChat({ desk, model, maxRounds = 6 }) {
       let modelId;
       let corrected = false;
       const visible = () => messages.slice(1).filter((m) => !HIDDEN.has(m));
+      // Bookings made in this turn get the conversation up to the reply the customer is about to see.
+      const finish = (result) => {
+        let booked;
+        for (const c of toolCalls) {
+          if (c.name !== 'book' || !c.result?.ok) continue;
+          booked = desk.updateTranscript(c.result.booking.reference, transcriptOf(messages), HUMAN).booking ?? booked;
+        }
+        return booked ? { ...result, booked } : result;
+      };
       // Stop and pass the customer to a person, with the conversation the customer actually saw.
       const handOver = (summary, flag) => {
         const { handover } = desk.handover({ reason: 'out_of_rules', transcript: transcriptOf(messages), summary }, HUMAN);
         const reply = ARABIC.test(text) ? HO.tell_customer_ar : HO.tell_customer_en;
         messages.push({ role: 'assistant', content: reply });
-        return { reply, toolCalls, modelId, [flag]: true, handover, history: visible() };
+        return finish({ reply, toolCalls, modelId, [flag]: true, handover, history: visible() });
       };
       for (let round = 0; round < maxRounds; round += 1) {
         const out = await model.complete({ messages, tools: CHAT_TOOLS });
@@ -102,7 +111,7 @@ export function createChat({ desk, model, maxRounds = 6 }) {
           // Every SAR amount and time in the reply must be one a desk tool returned in this session.
           const results = messages.filter((m) => m.role === 'tool').map((m) => JSON.parse(m.content));
           const invented = ungrounded(message.content, results);
-          if (!invented.length) return { reply: message.content ?? '', toolCalls, modelId, history: visible() };
+          if (!invented.length) return finish({ reply: message.content ?? '', toolCalls, modelId, history: visible() });
           HIDDEN.add(message);
           if (corrected) {
             return handOver(`The reply stated ${invented.join(', ')}, which no desk tool returned. Last message: ${text}`, 'guarded');

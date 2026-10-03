@@ -190,6 +190,8 @@ export function createDesk({ store, now = () => new Date() }) {
         contact: cap(input.contact, 200),
         services: q.lines.map((l) => l.service),
         tier: q.tier,
+        years_experience: Number.isFinite(input.years_experience) ? input.years_experience : null,
+        is_executive: input.is_executive === true,
         addons: q.addons.map((a) => a.id),
         price_quoted: q.total,
         currency: q.currency,
@@ -200,6 +202,14 @@ export function createDesk({ store, now = () => new Date() }) {
       };
       store.add('bookings', booking);
       return { ok: true, demo: true, booking };
+    },
+
+    /** Bring a booking's stored conversation up to date (the chat calls it at the end of a turn). Only the door that made it may. */
+    updateTranscript(reference, transcript, ctx) {
+      const d = door(ctx);
+      const booking = store.all('bookings').find((b) => b.reference === reference);
+      if (!booking || booking.door !== d) return refuse('unknown_booking', `No ${d} booking ${reference}.`);
+      return { ok: true, demo: true, booking: store.update('bookings', 'reference', reference, { transcript: cap(transcript, 20_000) }) };
     },
 
     /** Hand the conversation to a person. input: { reason?, summary?, customer_name?, contact? }. */

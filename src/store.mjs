@@ -1,4 +1,5 @@
-// Storage behind the smallest interface the desk needs: all(kind) and add(kind, record).
+// Storage behind the smallest interface the desk needs: all(kind), add(kind, record) and
+// update(kind, key, value, changes), which merges changes into the first record whose key equals value.
 // Kinds are 'bookings' and 'handovers'. Both stores are synchronous on purpose: in one Node process
 // a check-then-add inside desk.book cannot interleave with another request, so a slot cannot be taken twice.
 // Swapping in a hosted database later means keeping that guarantee (a unique constraint on the slot).
@@ -19,6 +20,13 @@ export function createMemoryStore() {
   return {
     all(kind) { checkKind(kind); return copy(state[kind]); },
     add(kind, record) { checkKind(kind); state[kind].push(copy(record)); },
+    update(kind, key, value, changes) {
+      checkKind(kind);
+      const i = state[kind].findIndex((r) => r[key] === value);
+      if (i === -1) return null;
+      state[kind][i] = { ...state[kind][i], ...copy(changes) };
+      return copy(state[kind][i]);
+    },
   };
 }
 
@@ -45,6 +53,20 @@ export function createFileStore(file) {
       writeFileSync(tmp, `${JSON.stringify(next, null, 2)}\n`);
       renameSync(tmp, file);
       state = next; // only after the write succeeded
+    },
+    update(kind, key, value, changes) {
+      checkKind(kind);
+      const i = state[kind].findIndex((r) => r[key] === value);
+      if (i === -1) return null;
+      const list = [...state[kind]];
+      list[i] = { ...list[i], ...copy(changes) };
+      const next = { ...state, [kind]: list };
+      mkdirSync(dirname(file), { recursive: true });
+      const tmp = `${file}.tmp`;
+      writeFileSync(tmp, `${JSON.stringify(next, null, 2)}\n`);
+      renameSync(tmp, file);
+      state = next; // only after the write succeeded
+      return copy(list[i]);
     },
   };
 }
