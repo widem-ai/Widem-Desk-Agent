@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { createHttpServer } from '../src/mcp-server.mjs';
-import { createChat, CHAT_TOOLS } from '../src/chat.mjs';
+import { createChat, createNebiusModel, CHAT_TOOLS } from '../src/chat.mjs';
 import { createDesk } from '../src/desk.mjs';
 import { createMemoryStore } from '../src/store.mjs';
 import { PROFILES } from './profiles.mjs';
@@ -47,7 +47,7 @@ async function agentDoorBooking(args) {
   }
 }
 
-test('an Arabic booking through the chat equals the agent door booking, apart from the door', async () => {
+test('an Arabic booking through the chat equals the agent door booking, apart from door and transcript', async () => {
   const store = createMemoryStore();
   const desk = createDesk({ store, now: at(NOW) });
   const model = scriptedModel([
@@ -74,7 +74,41 @@ test('an Arabic booking through the chat equals the agent door booking, apart fr
   assert.equal(human[0].door, 'human');
   const agent = await agentDoorBooking({ ...ORDER, slot: SLOT, ...CUSTOMER });
   assert.equal(agent.booking.door, 'agent');
-  assert.deepEqual({ ...human[0], door: 'same' }, { ...agent.booking, door: 'same' });
+  assert.match(human[0].transcript, /أريد الباقة الكاملة/);
+  assert.deepEqual({ ...human[0], door: 'same', transcript: 'same' }, { ...agent.booking, door: 'same', transcript: 'same' });
+});
+
+test('wrong types, missing or extra fields go back to the model as bad_arguments and never reach the desk', async () => {
+  const store = createMemoryStore();
+  const desk = createDesk({ store, now: at(NOW) });
+  const bad = [
+    { services: 'cv_rewrite', tier: 'senior' }, // string instead of array
+    { services: ['cv_rewrite'], tier: 7 }, // number instead of string
+    { services: ['cv_rewrite'] }, // tier missing
+    { services: ['cv_rewrite'], tier: 'senior', price: 1 }, // extra field
+    { services: [1], tier: 'senior' }, // array of numbers
+  ];
+  const calls = bad.map((args, i) => ({ id: `b${i}`, type: 'function', function: { name: 'quote', arguments: JSON.stringify(args) } }));
+  calls.push({ id: 'b5', type: 'function', function: { name: 'book', arguments: JSON.stringify({ ...ORDER, slot: SLOT, ...CUSTOMER, transcript: 'forged' }) } });
+  calls.push({ id: 'b6', type: 'function', function: { name: 'handover', arguments: '[]' } });
+  calls.push({ id: 'b7', type: 'function', function: { name: 'check_availability', arguments: JSON.stringify({ days: '3' }) } });
+  const model = scriptedModel([{ role: 'assistant', content: null, tool_calls: calls }, { role: 'assistant', content: 'ok' }]);
+  await createChat({ desk, model }).respond([], 'Hi');
+  const results = model.seen[1].messages.filter((m) => m.role === 'tool').map((m) => JSON.parse(m.content));
+  assert.equal(results.length, calls.length);
+  for (const r of results) assert.deepEqual([r.ok, r.error.code], [false, 'bad_arguments']);
+  assert.equal(store.all('bookings').length, 0);
+  assert.equal(store.all('handovers').length, 0);
+});
+
+test('a slow model times out with a model_timeout error the caller can catch', async () => {
+  const neverAnswers = (url, { signal }) => new Promise((_, reject) => {
+    signal.addEventListener('abort', () => reject(signal.reason));
+  });
+  const model = createNebiusModel({ baseUrl: 'http://model.invalid/v1', apiKey: 'test', timeoutMs: 50, fetchImpl: neverAnswers });
+  const started = Date.now();
+  await assert.rejects(model.complete({ messages: [], tools: [] }), (err) => err.code === 'model_timeout');
+  assert.ok(Date.now() - started < 2000);
 });
 
 test('the chat offers the model exactly the agent door tools, with the same parameters', async () => {

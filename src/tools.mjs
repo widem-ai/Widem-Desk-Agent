@@ -95,3 +95,26 @@ export function toZodShape(params, z) {
   }
   return shape;
 }
+
+const TYPE_CHECKS = {
+  string: (v) => typeof v === 'string',
+  number: (v) => typeof v === 'number' && Number.isFinite(v),
+  'string[]': (v) => Array.isArray(v) && v.every((x) => typeof x === 'string'),
+};
+
+/** Check arguments against a tool's parameters: a plain object, no unknown fields, required present, right types.
+ * Returns null when they are valid, or a short message naming the first problem. */
+export function checkArgs(params, args) {
+  if (!args || typeof args !== 'object' || Array.isArray(args)) return 'Arguments must be a JSON object.';
+  for (const key of Object.keys(args)) {
+    if (!Object.hasOwn(params, key)) return `Unknown field: ${key}.`;
+  }
+  for (const [key, p] of Object.entries(params)) {
+    if (args[key] === undefined) {
+      if (!p.optional) return `Missing field: ${key}.`;
+    } else if (!TYPE_CHECKS[p.type](args[key])) {
+      return `Field ${key} must be ${p.type === 'string[]' ? 'a list of strings' : `a ${p.type}`}.`;
+    }
+  }
+  return null;
+}

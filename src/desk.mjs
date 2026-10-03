@@ -102,6 +102,7 @@ export function createDesk({ store, now = () => new Date() }) {
       summary: cap(input?.summary, 2000),
       customer_name: cap(input?.customer_name, 120),
       contact: cap(input?.contact, 200),
+      ...(cap(input?.transcript, 20_000) ? { transcript: cap(input.transcript, 20_000) } : {}),
       status: 'open',
       ...extra,
     };

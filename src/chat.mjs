@@ -1,12 +1,13 @@
 // The human door's brain: a chat loop where the model talks to a customer and calls the same desk
 // tools as the agent door, in-process. Every tool result comes from the desk, never from the model.
 import { readFileSync } from 'node:fs';
-import { TOOLS, toJsonSchema } from './tools.mjs';
+import { TOOLS, checkArgs, toJsonSchema } from './tools.mjs';
 
 const HUMAN = { door: 'human' };
 const HO = JSON.parse(readFileSync(new URL('../data/demo-business.json', import.meta.url), 'utf8')).handover;
 export const DEFAULT_MODEL = 'nvidia/nemotron-3-super-120b-a12b';
 const ARABIC = /[؀-ۿ]/;
+const KEEPS_TRANSCRIPT = new Set(['book', 'handover']);
 
 export const SYSTEM_PROMPT = [
   'You are the front desk of a career-services studio (a fictional demo business). You help one customer',
@@ -27,9 +28,20 @@ export const CHAT_TOOLS = TOOLS.map((t) => ({
   function: { name: t.name, description: t.description, parameters: toJsonSchema(t.params) },
 }));
 
+/** What to tell the customer when the model cannot answer (timeout or error), in their language. */
+export const sorryReply = (text) => (ARABIC.test(text ?? '')
+  ? 'عذرًا، لم أتمكن من الرد الآن. حاول مرة أخرى بعد قليل.'
+  : 'Sorry, I could not answer just now. Please try again in a moment.');
+
+/** The conversation as plain text for the owner page: customer and desk lines only, no tool traffic. */
+export const transcriptOf = (messages) => messages
+  .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
+  .map((m) => `${m.role === 'user' ? 'Customer' : 'Desk'}: ${m.content.trim()}`)
+  .join('\n');
+
 const failure = (code, message) => ({ ok: false, demo: true, error: { code, message } });
 
-function runTool(desk, call) {
+function runTool(desk, call, messages) {
   const tool = TOOLS.find((t) => t.name === call.function?.name);
   if (!tool) return failure('unknown_tool', `There is no tool called ${call.function?.name}.`);
   let args;
@@ -38,12 +50,17 @@ function runTool(desk, call) {
   } catch {
     return failure('bad_arguments', 'The tool arguments were not valid JSON.');
   }
-  return tool.run(desk, args ?? {}, HUMAN);
+  const problem = checkArgs(tool.params, args);
+  if (problem) return failure('bad_arguments', problem);
+  // The transcript is added after the check, so the model can never write it.
+  const input = KEEPS_TRANSCRIPT.has(tool.name) ? { ...args, transcript: transcriptOf(messages) } : args;
+  return tool.run(desk, input, HUMAN);
 }
 
 /**
  * A chat over a desk. model.complete({ messages, tools }) returns { message, modelId }, where message
- * is an OpenAI-style assistant message. respond(history, text) returns { reply, toolCalls, modelId }.
+ * is an OpenAI-style assistant message. respond(history, text) returns { reply, toolCalls, modelId, history },
+ * where history is the conversation to pass in next turn (without the system prompt).
  */
 export function createChat({ desk, model, maxRounds = 6 }) {
   if (!desk || !model) throw new Error('createChat needs a desk and a model');
@@ -57,34 +74,52 @@ export function createChat({ desk, model, maxRounds = 6 }) {
         modelId = out.modelId;
         const message = out.message;
         messages.push(message);
-        if (!message.tool_calls?.length) return { reply: message.content ?? '', toolCalls, modelId };
+        if (!message.tool_calls?.length) {
+          return { reply: message.content ?? '', toolCalls, modelId, history: messages.slice(1) };
+        }
         for (const call of message.tool_calls) {
-          const result = runTool(desk, call);
+          const result = runTool(desk, call, messages);
           toolCalls.push({ name: call.function?.name, arguments: call.function?.arguments, result });
           messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(result) });
         }
       }
       // The model kept calling tools without answering: stop and pass the customer to a person.
-      desk.handover({ reason: 'out_of_rules', summary: `The chat stopped after ${maxRounds} tool rounds without an answer. Last message: ${text}` }, HUMAN);
-      return { reply: ARABIC.test(text) ? HO.tell_customer_ar : HO.tell_customer_en, toolCalls, modelId, capped: true };
+      const { handover } = desk.handover({ reason: 'out_of_rules', transcript: transcriptOf(messages),
+        summary: `The chat stopped after ${maxRounds} tool rounds without an answer. Last message: ${text}` }, HUMAN);
+      const reply = ARABIC.test(text) ? HO.tell_customer_ar : HO.tell_customer_en;
+      messages.push({ role: 'assistant', content: reply });
+      return { reply, toolCalls, modelId, capped: true, handover, history: messages.slice(1) };
     },
   };
 }
 
-/** A model on Nebius Token Factory (OpenAI-compatible chat completions), using built-in fetch. */
+const modelError = (code, message) => Object.assign(new Error(message), { code });
+
+/** A model on Nebius Token Factory (OpenAI-compatible chat completions), using built-in fetch.
+ * Errors carry code model_timeout (no answer within timeoutMs) or model_error, for a polite reply. */
 export function createNebiusModel({ baseUrl = process.env.NEBIUS_BASE_URL, apiKey = process.env.NEBIUS_API_KEY,
-  model = DEFAULT_MODEL, temperature = 0, fetchImpl = fetch } = {}) {
+  model = DEFAULT_MODEL, temperature = 0, timeoutMs = 20_000, fetchImpl = fetch } = {}) {
   if (!baseUrl || !apiKey) throw new Error('createNebiusModel needs NEBIUS_BASE_URL and NEBIUS_API_KEY');
   const url = `${baseUrl.replace(/\/$/, '')}/chat/completions`;
   return {
     async complete({ messages, tools }) {
-      const res = await fetchImpl(url, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ model, messages, tools, tool_choice: 'auto', temperature }),
-      });
-      if (!res.ok) throw new Error(`model call failed: HTTP ${res.status}`);
-      const data = await res.json();
+      let data;
+      try {
+        const res = await fetchImpl(url, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({ model, messages, tools, tool_choice: 'auto', temperature }),
+          signal: AbortSignal.timeout(timeoutMs),
+        });
+        if (!res.ok) throw modelError('model_error', `model call failed: HTTP ${res.status}`);
+        data = await res.json();
+      } catch (err) {
+        if (err?.code === 'model_error') throw err;
+        if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
+          throw modelError('model_timeout', `model did not answer within ${timeoutMs} ms`);
+        }
+        throw modelError('model_error', `model call failed: ${err?.message}`);
+      }
       return { message: data.choices[0].message, modelId: data.model ?? model };
     },
   };
