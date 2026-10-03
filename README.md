@@ -11,7 +11,7 @@ Both doors call the same core, so a person and an agent asking for the same thin
 
 ## Status
 
-Built so far: the core (prices, free slots, bookings and handover to a person) the agent door with all five tools, and the chat endpoint for people (POST /chat, Nemotron calling the same tools). The chat page and the owner page come next.
+Built so far: the core (prices, free slots, bookings and handover to a person), the agent door with all five tools, and the chat endpoint for people (POST /chat, Nemotron calling the same tools). The chat page and the owner page come next.
 
 | Tool | What it does |
 |---|---|
