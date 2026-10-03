@@ -5,8 +5,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
-import { listServices } from './core.mjs';
 import { createDesk } from './desk.mjs';
+import { TOOLS, toZodShape } from './tools.mjs';
 import { createFileStore, createMemoryStore } from './store.mjs';
 
 const MAX_BODY_BYTES = 64 * 1024;
@@ -19,78 +19,16 @@ const asResult = (value, isError = false) => ({
 
 export function createMcpServer(desk) {
   const server = new McpServer({ name: 'widem-agent-desk', version: '0.1.0' });
-
-  server.registerTool('list_services', {
-    title: 'List services',
-    description: 'List everything this career-services studio offers (a fictional demo business): services with '
-      + 'English and Arabic names, the price for each tier (junior, mid, senior, executive) in SAR, bundles and '
-      + 'add-ons. Call this first, then use the ids it returns in quote.',
-    inputSchema: {},
-  }, async () => asResult(listServices()));
-
-  server.registerTool('quote', {
-    title: 'Quote a price',
-    description: 'Price an order for one customer. Pass the service ids from list_services, the customer tier '
-      + '(junior, mid, senior or executive, by years of experience) and any add-on ids. Returns an itemised '
-      + 'quote with bundle discounts applied, or a refusal with a reason code when the request is outside '
-      + 'the rules. A request the rules cannot price is handed to a person automatically: the reply then '
-      + 'includes a handover with what to tell the customer. Never invent a price: quote the total exactly as returned.',
-    inputSchema: {
-      services: z.array(z.string()).describe('Service ids, e.g. ["cv_rewrite", "linkedin_profile"]'),
-      tier: z.string().describe('junior | mid | senior | executive'),
-      addons: z.array(z.string()).optional().describe('Add-on ids, e.g. ["express"]'),
-    },
-  }, async (args) => {
-    const result = desk.quote(args, AGENT);
-    return asResult(result, !result.ok);
-  });
-
-  server.registerTool('check_availability', {
-    title: 'Check free slots',
-    description: 'List free 60-minute kickoff-call slots, in Asia/Riyadh time (UTC+3). Optionally pass from '
-      + '(YYYY-MM-DD, default today in Riyadh) and days (1 to 7, default 7). Each slot has a start and end with '
-      + 'the offset included; pass a start to book exactly as returned.',
-    inputSchema: {
-      from: z.string().optional().describe('First date to check, YYYY-MM-DD in Riyadh time'),
-      days: z.number().optional().describe('How many days to check, 1 to 7'),
-    },
-  }, async (args) => {
-    const result = desk.checkAvailability(args);
-    return asResult(result, !result.ok);
-  });
-
-  server.registerTool('book', {
-    title: 'Book a kickoff call',
-    description: 'Book one customer into a free slot from check_availability. Pass the same services, tier and '
-      + 'add-ons you quoted, the slot start exactly as returned, and the customer name and a contact (email or '
-      + 'phone). The order is priced again by the same rules and the price is stored with the booking. Returns '
-      + 'a booking reference, or a refusal with a reason code (slot_taken: pick another free slot).',
-    inputSchema: {
-      services: z.array(z.string()).describe('Service ids from list_services'),
-      tier: z.string().describe('junior | mid | senior | executive'),
-      addons: z.array(z.string()).optional().describe('Add-on ids, e.g. ["express"]'),
-      slot: z.string().describe('A slot start from check_availability, e.g. "2026-10-05T11:00:00+03:00"'),
-      customer_name: z.string().describe("The customer's name"),
-      contact: z.string().describe('Email or phone number for the customer'),
-    },
-  }, async (args) => {
-    const result = desk.book(args, AGENT);
-    return asResult(result, !result.ok);
-  });
-
-  server.registerTool('handover', {
-    title: 'Hand over to a person',
-    description: 'Pass the customer to a person at the business. Use it when the customer asks for a person '
-      + '(reason talk_to_a_person) or wants anything the rules do not cover, such as a discount, a complaint or '
-      + 'an unusual case (reason out_of_rules). Returns what to tell the customer, in English and Arabic.',
-    inputSchema: {
-      reason: z.string().describe('talk_to_a_person | out_of_rules'),
-      summary: z.string().optional().describe('One or two sentences on what the customer wants'),
-      customer_name: z.string().optional().describe("The customer's name, if known"),
-      contact: z.string().optional().describe('Email or phone number, if known'),
-    },
-  }, async (args) => asResult(desk.handover(args, AGENT)));
-
+  for (const tool of TOOLS) {
+    server.registerTool(tool.name, {
+      title: tool.title,
+      description: tool.description,
+      inputSchema: toZodShape(tool.params, z),
+    }, async (args) => {
+      const result = tool.run(desk, args ?? {}, AGENT);
+      return asResult(result, result?.ok === false);
+    });
+  }
   return server;
 }
 
