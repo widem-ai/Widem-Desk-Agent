@@ -86,10 +86,11 @@ test('teaser lines ("and more", an ellipsis) are dropped from a slot list; the s
     'أقرب المواعيد:', '', '- الثلاثاء 10:00 إلى 11:00', '- الثلاثاء 11:00 إلى 12:00', '- … (وغيرها من الفترات المذكورة في القائمة)',
     '', '(وهناك مواعيد إضافية في الأيام التالية إذا لم تناسبك هذه.)', '', 'لحجز الموعد، أرسل اسمك وبريدك.'].join('\n'))]);
   const out = await createChat({ desk, model }).respond([], 'متى؟');
-  assert.equal(out.reply, 'أقرب المواعيد:\n\n- الثلاثاء 10:00 إلى 11:00\n- الثلاثاء 11:00 إلى 12:00\n\nلحجز الموعد، أرسل اسمك وبريدك.');
+  // List markers are removed by the markdown post-step (reply-text.test.mjs); the slot lines themselves stay.
+  assert.equal(out.reply, 'أقرب المواعيد:\n\nالثلاثاء 10:00 إلى 11:00\nالثلاثاء 11:00 إلى 12:00\n\nلحجز الموعد، أرسل اسمك وبريدك.');
   const en = scriptedModel([toolCall('a', 'check_availability', { from: '2026-10-06', days: 1 }),
     say('Free:\n- 10:00 to 11:00\n...\n(More slots are available later in the week.)\nWhich one?')]);
-  assert.equal((await createChat({ desk: fresh().desk, model: en }).respond([], 'When?')).reply, 'Free:\n- 10:00 to 11:00\nWhich one?');
+  assert.equal((await createChat({ desk: fresh().desk, model: en }).respond([], 'When?')).reply, 'Free:\n10:00 to 11:00\nWhich one?');
 });
 
 test('a confirmation that states the slot but not the price gets only the price, so nothing is said twice', async () => {

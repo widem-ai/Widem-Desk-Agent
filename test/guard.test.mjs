@@ -46,7 +46,7 @@ test('ungrounded() finds amounts and times in Western and Arabic digits, and ign
 
 test('a correct quoted price passes byte-identical', async () => {
   const { desk } = fresh();
-  const text = '\nThe full career pack at the senior tier is **1575 SAR** (10% bundle discount applied).';
+  const text = '\nThe full career pack at the senior tier is 1575 SAR (10% bundle discount applied).';
   const model = scriptedModel([toolCall('q', 'quote', ORDER), say(text)]);
   const out = await createChat({ desk, model }).respond([], 'Full pack, senior. Price?');
   assert.equal(out.reply, text);

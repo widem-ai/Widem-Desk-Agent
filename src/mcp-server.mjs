@@ -135,6 +135,8 @@ function createChatRoute(desk, model, limits, now) {
       send(res, 503, { error: { code }, reply: sorryReply(message) }); // the failed turn is not kept
       return;
     }
+    // Log English leaking into an Arabic reply (the words only, never the customer's message); the reply still goes out.
+    if (out.latin?.length) console.warn(`chat reply: Latin words in an Arabic reply: ${out.latin.join(', ')}`);
     sessions.delete(id);
     sessions.set(id, trimHistory(out.history, limits.maxHistoryMessages));
     if (sessions.size > limits.maxSessions) sessions.delete(sessions.keys().next().value);

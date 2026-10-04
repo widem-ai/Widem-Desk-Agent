@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { TOOLS, checkArgs, toJsonSchema } from './tools.mjs';
 import { toWestern, ungrounded } from './guard.mjs';
 import { slotLabels } from './labels.mjs';
+import { latinWords } from './latin.mjs';
 
 const HUMAN = { door: 'human' };
 const DATA = JSON.parse(readFileSync(new URL('../data/demo-business.json', import.meta.url), 'utf8'));
@@ -56,6 +57,27 @@ export function plainDashes(text) {
     .replace(/(\d)\s*[\u2012-\u2015]\s*(?=\d)/g, `$1${to}`)
     .replace(/\s+[\u2012-\u2015]\s+/g, ', ')
     .replace(/[\u2010-\u2015]/g, '-');
+}
+
+/** Plain text for a chat bubble: no markdown emphasis, headings, bullet markers or code ticks, which the customer
+ * would see as symbols. Numbered steps, hyphens inside a line, references and emails stay. */
+export function plainMarkdown(text) {
+  if (typeof text !== 'string') return text;
+  return text
+    .replace(/^[ \t]*#{1,6}[ \t]+/gm, '')
+    .replace(/^[ \t]*[-*+•][ \t]+/gm, '')
+    .replace(/\*+|`/g, '')
+    .replace(/__(.+?)__/g, '$1')
+    .replace(/[ \t]+$/gm, '');
+}
+
+/** Arabic punctuation in an Arabic reply: the Arabic comma (not between digits, where it groups thousands) and a
+ * hyphen range of numbers or times ("3-8", "10:00-11:00") said with "إلى". Dates and references stay. */
+export function arabicPunctuation(text) {
+  if (typeof text !== 'string' || !ARABIC.test(text)) return text;
+  return text
+    .replace(/(?<![\d-])(\d{1,2}(?::\d{2})?)\s*-\s*(\d{1,2}(?::\d{2})?)(?![\d-])/g, '$1 إلى $2')
+    .replace(/,/g, (comma, i, s) => (/\d/.test(s[i - 1] ?? '') && /\d/.test(s[i + 1] ?? '') ? comma : '،'));
 }
 
 // A line that teases more slots ("and more", an ellipsis) instead of listing them.
@@ -124,7 +146,9 @@ export function createChat({ desk, model, maxRounds = 6 }) {
           if (c.name !== 'book' || !c.result?.ok) continue;
           booked = desk.updateTranscript(c.result.booking.reference, transcriptOf(messages), HUMAN).booking ?? booked;
         }
-        return booked ? { ...result, booked } : result;
+        // A measure, not a block: Latin words in an Arabic reply, for the server to log.
+        const out = { ...result, latin: latinWords(result.reply) };
+        return booked ? { ...out, booked } : out;
       };
       // Stop and pass the customer to a person, with the conversation the customer actually saw.
       const handOver = (summary, flag) => {
@@ -137,7 +161,7 @@ export function createChat({ desk, model, maxRounds = 6 }) {
         const out = await model.complete({ messages, tools: CHAT_TOOLS });
         modelId = out.modelId;
         // Tool calls go back as they came; a text reply is cleaned before the guard and the customer see it.
-        const message = out.message.tool_calls?.length ? out.message : { ...out.message, content: plainDashes(out.message.content) };
+        const message = out.message.tool_calls?.length ? out.message : { ...out.message, content: arabicPunctuation(plainDashes(plainMarkdown(out.message.content))) };
         messages.push(message);
         if (!message.tool_calls?.length) {
           // Every SAR amount and time in the reply must be one a desk tool returned in this session.
