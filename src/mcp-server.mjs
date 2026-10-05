@@ -9,7 +9,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { z } from 'zod';
 import { createDesk } from './desk.mjs';
 import { toolsFor, toZodShape } from './tools.mjs';
-import { createChat, createNebiusModel, sorryReply } from './chat.mjs';
+import { createChat, createNebiusModel, sorryReply, langFromEnv } from './chat.mjs';
 import { widgetsFor, trimSlotLines, pickSlotLine, newWidgetState, trimRecReply } from './widgets.mjs';
 import { createFileStore, createMemoryStore } from './store.mjs';
 import { slotLabels } from './labels.mjs';
@@ -87,6 +87,8 @@ export const CHAT_LIMITS = {
 const MAX_MESSAGE_CHARS = 4000;
 const BUSY_REPLY = 'Too many messages for now. Please try again in a few minutes.\n'
   + 'عدد الرسائل كبير الآن. يرجى المحاولة مرة أخرى بعد بضع دقائق.';
+/** The busy reply: both languages on the bilingual desk, the English line only on the English desk. */
+const busyReply = (lang) => (lang === 'ar' ? BUSY_REPLY : BUSY_REPLY.split('\n')[0]);
 
 /** Token buckets by key: each holds up to size tokens and refills size per windowMs, continuously. */
 function createBuckets(size, windowMs, now) {
@@ -118,8 +120,8 @@ function trimHistory(history, max) {
 /** The human door over HTTP: POST /chat { sessionId?, message } -> { sessionId, reply, booked?, handover? }.
  * The server issues session ids (send none to start); an id it did not issue gets a 400, never another
  * session's history. History lives in memory and is lost on restart. */
-function createChatRoute(desk, model, limits, now) {
-  const chat = model ? createChat({ desk, model }) : null;
+function createChatRoute(desk, model, limits, now, lang = 'ar') {
+  const chat = model ? createChat({ desk, model, lang }) : null;
   const sessions = new Map();
   const uiStates = new Map(); // per session: what the widgets have shown so far (a quote, free slots)
   const perIp = createBuckets(limits.perIp.messages, limits.perIp.windowMs, now);
@@ -130,11 +132,11 @@ function createChatRoute(desk, model, limits, now) {
   function pay({ sessionId }, req, res, fail) {
     if (typeof sessionId !== 'string' || !sessions.has(sessionId)) { fail(400, 'Send the sessionId of this chat.', 'unknown_session'); return; }
     const wait = perIp.take(req.socket.remoteAddress ?? 'unknown');
-    if (wait) { res.setHeader('retry-after', String(wait)); send(res, 429, { error: { code: 'rate_limited' }, reply: BUSY_REPLY }); return; }
+    if (wait) { res.setHeader('retry-after', String(wait)); send(res, 429, { error: { code: 'rate_limited' }, reply: busyReply(lang) }); return; }
     const state = uiStates.get(sessionId) ?? newWidgetState();
     if (!state.awaitingPayment) { fail(409, 'Nothing is waiting for payment in this chat.', 'nothing_to_pay'); return; }
     const history = sessions.get(sessionId);
-    const arabic = /[؀-ۿ]/.test(history.findLast((m) => m.role === 'user')?.content ?? '');
+    const arabic = lang === 'ar' && /[؀-ۿ]/.test(history.findLast((m) => m.role === 'user')?.content ?? '');
     const out = desk.pay(state.awaitingPayment, { door: 'human' });
     uiStates.set(sessionId, { ...state, awaitingPayment: undefined });
     let reply;
@@ -166,12 +168,12 @@ function createChatRoute(desk, model, limits, now) {
       fail(400, 'This chat has ended. Send the message without a sessionId to start a new one.', 'unknown_session');
       return;
     }
-    if (!chat) { send(res, 503, { error: { code: 'chat_not_configured' }, reply: sorryReply(message) }); return; }
+    if (!chat) { send(res, 503, { error: { code: 'chat_not_configured' }, reply: sorryReply(message, lang) }); return; }
     const ip = req.socket.remoteAddress ?? 'unknown';
     const wait = perIp.take(ip) || (sessionId === undefined && newSessions.take(ip)) || global.take('all');
     if (wait) {
       res.setHeader('retry-after', String(wait));
-      send(res, 429, { error: { code: 'rate_limited' }, reply: BUSY_REPLY });
+      send(res, 429, { error: { code: 'rate_limited' }, reply: busyReply(lang) });
       return;
     }
     const id = sessionId ?? randomUUID();
@@ -181,7 +183,7 @@ function createChatRoute(desk, model, limits, now) {
     } catch (err) {
       const code = err?.code === 'model_timeout' ? 'model_timeout' : 'model_error';
       console.error('chat turn failed:', code, err?.message);
-      send(res, 503, { error: { code }, reply: sorryReply(message) }); // the failed turn is not kept
+      send(res, 503, { error: { code }, reply: sorryReply(message, lang) }); // the failed turn is not kept
       return;
     }
     // Log English leaking into an Arabic reply (the words only, never the customer's message); the reply still goes out.
@@ -195,7 +197,7 @@ function createChatRoute(desk, model, limits, now) {
     const { ui, state } = widgetsFor({ toolCalls: out.toolCalls, state: uiStates.get(id) ?? newWidgetState(), booked, handover, picked: out.picked });
     if (sessions.has(id)) uiStates.set(id, state);
     let reply = out.reply.replace(/^(\s*\n)+/, '');
-    if (ui.some((w) => w.type === 'slots')) reply = trimSlotLines(reply) || pickSlotLine(/[؀-ۿ]/.test(message));
+    if (ui.some((w) => w.type === 'slots')) reply = trimSlotLines(reply) || pickSlotLine(lang === 'ar' && /[؀-ۿ]/.test(message));
     const recCard = ui.find((w) => w.type === 'recommend'); // the card carries the services and the total
     if (recCard) reply = trimRecReply(reply, recCard);
     send(res, 200, { sessionId: id, reply,
@@ -206,8 +208,8 @@ function createChatRoute(desk, model, limits, now) {
 /** Both doors over one desk: the agent door at /mcp and, when a model is given, the human door at /chat.
  * Without a desk it runs on a memory store (nothing is kept). */
 export function createHttpServer({ desk = createDesk({ store: createMemoryStore() }), model, limits = CHAT_LIMITS,
-  now = Date.now } = {}) {
-  const chatRoute = createChatRoute(desk, model, limits, now);
+  now = Date.now, lang = 'ar' } = {}) {
+  const chatRoute = createChatRoute(desk, model, limits, now, lang);
   return http.createServer(async (req, res) => {
     const path = new URL(req.url, 'http://x').pathname;
     if (path === '/' && (req.method === 'GET' || req.method === 'HEAD')) { // the chat page for people (read per request: a prototype)
@@ -246,5 +248,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   console.log(`Bookings and handovers are kept in ${storeFile}`);
   const model = process.env.NEBIUS_API_KEY && process.env.NEBIUS_BASE_URL ? createNebiusModel() : undefined;
   console.log(model ? 'Human door (chat) uses the model on Nebius Token Factory' : 'Human door (chat) is off: NEBIUS_API_KEY or NEBIUS_BASE_URL is not set');
-  createHttpServer({ desk, model }).listen(port, host, () => console.log(`Agent door (MCP) on http://${host}:${port}/mcp, chat page on http://${host}:${port}/`));
+  const lang = langFromEnv();
+  console.log(`Desk language: ${lang} (DESK_LANG=ar for the bilingual desk)`);
+  createHttpServer({ desk, model, lang }).listen(port, host, () => console.log(`Agent door (MCP) on http://${host}:${port}/mcp, chat page on http://${host}:${port}/`));
 }

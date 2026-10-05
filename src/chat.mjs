@@ -73,8 +73,20 @@ export const CHAT_TOOLS = TOOLS.map((t) => ({
   function: { name: t.name, description: t.description, parameters: toJsonSchema(t.params) },
 }));
 
-/** What to tell the customer when the model cannot answer (timeout or error), in their language. */
-export const sorryReply = (text) => (ARABIC.test(text ?? '')
+// DESK_LANG (Mohannad, 2026-10-06): "en" (the server's default) replies in English whatever the customer writes;
+// "ar" is the bilingual desk, kept as a draft for an Arab audience. Only the language rule of the prompt differs.
+const AR_RULE = /4\. Reply in the language the customer writes in: Arabic or English\. In Arabic, use the Arabic names and labels the\s+tools return \(name_ar, tier_name_ar, label_ar, call_name_ar\), never ids\./;
+const EN_RULE = '4. Always reply in English, even when the customer writes in Arabic or another language. Use the English names and '
+  + 'labels the tools return (name_en, tier_name_en, label_en, call_name_en), never ids.';
+if (!AR_RULE.test(SYSTEM_PROMPT)) throw new Error('chat.mjs: the language rule of SYSTEM_PROMPT changed; update AR_RULE');
+const PROMPTS = { ar: SYSTEM_PROMPT, en: SYSTEM_PROMPT.replace(AR_RULE, EN_RULE) };
+/** The system prompt for a desk language: "ar" is the bilingual prompt, anything else the English-only one. */
+export const promptFor = (lang) => PROMPTS[lang === 'ar' ? 'ar' : 'en'];
+/** The desk language from the environment: DESK_LANG=ar keeps the bilingual desk; unset or anything else is "en". */
+export const langFromEnv = (env = process.env) => (env.DESK_LANG === 'ar' ? 'ar' : 'en');
+
+/** What to tell the customer when the model cannot answer (timeout or error): in Arabic only on the bilingual desk. */
+export const sorryReply = (text, lang = 'ar') => (lang === 'ar' && ARABIC.test(text ?? '')
   ? 'عذرًا، لم أتمكن من الرد الآن. حاول مرة أخرى بعد قليل.'
   : 'Sorry, I could not answer just now. Please try again in a moment.');
 
@@ -243,11 +255,12 @@ function runTool(desk, call, messages) {
  * is an OpenAI-style assistant message. respond(history, text) returns { reply, toolCalls, modelId, history },
  * where history is the conversation to pass in next turn (without the system prompt).
  */
-export function createChat({ desk, model, maxRounds = 6 }) {
+export function createChat({ desk, model, maxRounds = 6, lang = 'ar' }) {
+  const arabic = (t) => lang === 'ar' && ARABIC.test(t ?? ''); // English replies on the English desk
   if (!desk || !model) throw new Error('createChat needs a desk and a model');
   return {
     async respond(history, text) {
-      const messages = [{ role: 'system', content: SYSTEM_PROMPT }, ...history, { role: 'user', content: text }];
+      const messages = [{ role: 'system', content: promptFor(lang) }, ...history, { role: 'user', content: text }];
       const toolCalls = [];
       let modelId;
       let corrected = false;
@@ -285,7 +298,7 @@ export function createChat({ desk, model, maxRounds = 6 }) {
       // Stop and pass the customer to a person, with the conversation the customer actually saw.
       const handOver = (summary, flag) => {
         const { handover } = desk.handover({ reason: 'out_of_rules', transcript: transcriptOf(messages), summary }, HUMAN);
-        const reply = handoverReply(flag === 'guarded' ? 'guarded' : 'out_of_rules', ARABIC.test(text));
+        const reply = handoverReply(flag === 'guarded' ? 'guarded' : 'out_of_rules', arabic(text));
         messages.push({ role: 'assistant', content: reply });
         return finish({ reply, toolCalls, modelId, [flag]: true, handover, history: visible() });
       };
@@ -312,7 +325,7 @@ export function createChat({ desk, model, maxRounds = 6 }) {
           // A handover this turn (by the model or by a tool refusal) ends the line: the reply is built in code.
           const handed = toolCalls.findLast((c) => c.result?.handover)?.result.handover;
           if (handed) {
-            message.content = handoverReply(handed.reason, ARABIC.test(text));
+            message.content = handoverReply(handed.reason, arabic(text));
             return finish({ reply: message.content, toolCalls, modelId, history: visible() });
           }
           // Every SAR amount and time in the reply must be one a desk tool returned in this session.
@@ -359,11 +372,11 @@ export function createChat({ desk, model, maxRounds = 6 }) {
             if (toolCalls.some((c) => c.name === 'check_availability')) reply = dropTeasers(reply);
             const booking = toolCalls.findLast((c) => c.name === 'book' && c.result?.ok)?.result.booking;
             if (booking) {
-              reply = booking.status === 'awaiting_payment' ? heldLine(booking, ARABIC.test(text)) : withConfirmation(reply, booking, ARABIC.test(text));
+              reply = booking.status === 'awaiting_payment' ? heldLine(booking, arabic(text)) : withConfirmation(reply, booking, arabic(text));
             }
             // A reply held back for slots first may have carried the quoted total; the customer still gets it.
             const quoted = (nudged || pickNudged) && toolCalls.findLast((c) => c.name === 'quote' && c.result?.ok)?.result;
-            if (quoted) reply = withQuotedTotal(reply, quoted.total, ARABIC.test(text));
+            if (quoted) reply = withQuotedTotal(reply, quoted.total, arabic(text));
             message.content = reply;
             return finish({ reply, toolCalls, modelId, history: visible() });
           }
