@@ -28,7 +28,7 @@ export const SYSTEM_PROMPT = [
   'asks for a person) goes to handover. Then tell the customer what handover returned.',
   '4. Reply in the language the customer writes in: Arabic or English. In Arabic, use the Arabic names and labels the',
   'tools return (name_ar, tier_name_ar, label_ar, call_name_ar), never ids. Keep replies short.',
-  '5. Ask for the customer name and a contact (email or phone) before booking.',
+  '5. Show the free slots first. Ask for the customer name and a contact (email or phone) after that, before booking.',
 ].join('\n');
 
 /** Tool schemas for an OpenAI-compatible chat completions call, built from the shared definitions. */
@@ -78,6 +78,16 @@ export function arabicPunctuation(text) {
   return text
     .replace(/(?<![\d-])(\d{1,2}(?::\d{2})?)\s*-\s*(\d{1,2}(?::\d{2})?)(?![\d-])/g, '$1 إلى $2')
     .replace(/,/g, (comma, i, s) => (/\d/.test(s[i - 1] ?? '') && /\d/.test(s[i + 1] ?? '') ? comma : '،'));
+}
+
+// A reply that asks the customer for their name and a contact (both), in Arabic or English.
+const ASKS_NAME = /اسمك|اسم حضرتك|your (?:full )?name/i;
+const ASKS_CONTACT = /بريد|هاتف|جوال|تواصل|e-?mail|phone|contact/i;
+
+/** True when a reply asks for name and contact while no free slots have been shown in this conversation. */
+export function asksForContactFirst(reply, messages) {
+  if (typeof reply !== 'string' || !ASKS_NAME.test(reply) || !ASKS_CONTACT.test(reply)) return false;
+  return !messages.some((m) => m.tool_calls?.some((c) => c.function?.name === 'check_availability'));
 }
 
 // A line that teases more slots ("and more", an ellipsis) instead of listing them.
@@ -138,6 +148,7 @@ export function createChat({ desk, model, maxRounds = 6 }) {
       const toolCalls = [];
       let modelId;
       let corrected = false;
+      let nudged = false; // the slots-first note goes to the model at most once per turn
       const visible = () => messages.slice(1).filter((m) => !HIDDEN.has(m));
       // Bookings made in this turn get the conversation up to the reply the customer is about to see.
       const finish = (result) => {
@@ -167,6 +178,17 @@ export function createChat({ desk, model, maxRounds = 6 }) {
           // Every SAR amount and time in the reply must be one a desk tool returned in this session.
           const results = messages.filter((m) => m.role === 'tool').map((m) => JSON.parse(m.content));
           const invented = ungrounded(message.content, results);
+          if (!invented.length && !nudged && asksForContactFirst(message.content, messages)) {
+            // Slots first (Mohannad, 2026-10-05): hold back a reply that asks for name and contact before any slot
+            // was shown, once. If the model asks again, that reply goes out; it is not a reason to hand over.
+            nudged = true;
+            HIDDEN.add(message);
+            const nudge = { role: 'user', content: 'Desk check, not from the customer: show the free slots first. Call '
+              + 'check_availability and list them; ask for the name and contact after the customer picks one.' };
+            HIDDEN.add(nudge);
+            messages.push(nudge);
+            continue;
+          }
           if (!invented.length) {
             // Deterministic post-steps on a reply the guard passed: no teaser lines, and a confirmation that
             // states the slot and price from the book result. Both add only values a tool returned.

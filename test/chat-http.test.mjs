@@ -54,6 +54,8 @@ async function withServer(model, fn, { limits, clock = { t: 0 } } = {}) {
 
 test('the server issues the session id; a booking keeps the facts and the whole turn, confirmation included', async () => {
   const model = scriptedModel([
+    // Slots first (2026-10-05): the desk checks the free slots before it asks for name and contact.
+    toolCall('c0', 'check_availability', { from: '2026-10-06', days: 1 }),
     { role: 'assistant', content: '\n\nWhat is your name and email?' },
     toolCall('c1', 'book', { ...ORDER, slot: SLOT, customer_name: 'Sara', contact: 'sara@example.com' }),
     { role: 'assistant', content: 'Booked: BK-0001, Tuesday 10:00 to 11:00, 1575 SAR.' },
