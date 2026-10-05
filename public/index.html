@@ -89,7 +89,7 @@ header { display: flex; align-items: center; gap: 12px; padding-block: 18px 14px
 .starters .btn { white-space: normal; text-align: center; }
 .starters { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 
-form { display: flex; gap: 8px; padding: 12px; border-block-start: 1px solid var(--line); background: var(--surface); }
+#form { display: flex; gap: 8px; padding: 12px; border-block-start: 1px solid var(--line); background: var(--surface); }
 textarea {
   flex: 1; resize: none; min-height: 48px; max-height: 160px; padding: 11px 14px; border-radius: 12px;
   border: 1px solid var(--line); background: var(--bg); line-height: 1.5;
@@ -145,7 +145,7 @@ textarea::placeholder { color: var(--muted); opacity: 1; }
 .field input { min-height: 44px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--muted); background: var(--surface); width: 100%; }
 .err { color: var(--warn); font-size: 14px; margin: 0 0 8px; }
 .err:empty { display: none; }
-.go { background: var(--accent); color: var(--on-accent); border-color: transparent; }
+.go { justify-self: start; background: var(--accent); color: var(--on-accent); border-color: transparent; }
 @media (prefers-reduced-motion: no-preference) { .widgets { animation: enter 220ms var(--ease-out) both; } }
 </style>
 </head>
