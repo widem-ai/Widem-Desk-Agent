@@ -64,6 +64,13 @@ export function widgetsFor({ toolCalls = [], state = newWidgetState(), booked, h
       const old = ui.findIndex((w) => w.type === 'choices'); if (old >= 0) ui.splice(old, 1);
       ui.push({ type: 'choices', topic: c.result.topic, options: c.result.options });
     }
+    if (c.name === 'recommend' && Number.isFinite(c.result.quote?.total)) {
+      const r = c.result; const q = r.quote;
+      ui.push({ type: 'recommend', goal: r.goal, goal_line_en: r.goal_line_en, goal_line_ar: r.goal_line_ar,
+        services: r.services, why_en: r.why_en, why_ar: r.why_ar, tier: q.tier, tier_name_en: q.tier_name_en,
+        tier_name_ar: q.tier_name_ar, total: q.total, currency: q.currency ?? DATA.currency, status: r.status, why_status: r.why_status });
+      next.quoted = true;
+    }
     if (c.name === 'quote' && Number.isFinite(c.result.total)) {
       const old = ui.findIndex((w) => w.type === 'quote'); if (old >= 0) ui.splice(old, 1); // the latest quote wins
       ui.push(quoteCard(c.result)); next.quoted = true;
@@ -84,7 +91,8 @@ export function widgetsFor({ toolCalls = [], state = newWidgetState(), booked, h
   if (booked || handover || toolCalls.some((c) => c.result?.handover || (c.name === 'book' && c.result?.ok))) {
     return { ui: [], state: { ...next, done: true } };
   }
-  ui.sort((a, b) => (a.type === 'quote' ? -1 : b.type === 'quote' ? 1 : 0));
+  const RANK = { recommend: 0, quote: 1 };
+  ui.sort((a, b) => (RANK[a.type] ?? 2) - (RANK[b.type] ?? 2));
   // Any ask_choice call, even a refused topic, makes this a discovery turn: no services-and-tiers picker under a
   // question (live run 2026-10-05, turn 3, where a refused topic brought the picker back).
   const discovery = toolCalls.some((c) => c.name === 'ask_choice');

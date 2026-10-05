@@ -7,6 +7,7 @@ const TOOLS = toolsFor('human'); // never the agent-only pay tool: people pay wi
 import { toWestern, ungrounded, paymentClaims, statedAmounts } from './guard.mjs';
 import { slotLabels } from './labels.mjs';
 import { latinWords, arabicWords } from './latin.mjs';
+import { pendingRecommendation, quoteArgsFor, REC_CALL_PREFIX } from './recommend.mjs';
 
 const HUMAN = { door: 'human' };
 const DATA = JSON.parse(readFileSync(new URL('../data/demo-business.json', import.meta.url), 'utf8'));
@@ -49,6 +50,9 @@ export const SYSTEM_PROMPT = [
   'Never ask about budget, and never ask for a name or contact before the customer picks a time.',
   'd. Then say their goal back in one sentence in their own words, and recommend one option from the fit rules below.',
   'Call quote for it and state the total once, as returned. The value comes only from the service description.',
+  'When the desk has already quoted the recommendation (a quote call with an id starting desk_rec), the page shows it as a',
+  'card with their goal, the services, why it fits and the total. Then say their goal back in one short sentence, ask for',
+  'the booking and call check_availability; do not list the services or prices again.',
   'e. From the quote on, every reply ends with the booking ask: call check_availability and point to the times below.',
   'f. Soft objections (too expensive, let me think, not now): at most two loops in the whole chat. Acknowledge, raise',
   'one certainty from the rules or lower the ask (start with one service, or a later time), then ask again. After the',
@@ -270,6 +274,19 @@ export function createChat({ desk, model, maxRounds = 6 }) {
         messages.push({ role: 'assistant', content: reply });
         return finish({ reply, toolCalls, modelId, [flag]: true, handover, history: visible() });
       };
+      // The recommendation (playbook stages 3-4), chosen and priced in code: once the customer has given a goal and
+      // tapped a years button, the desk quotes the fit table's services itself, before the model replies, so the model
+      // sees the same total the card shows. Services the model adds on its own never replace it (live run 2026-10-05).
+      const rec = pendingRecommendation(messages);
+      if (rec) {
+        const args = quoteArgsFor(rec);
+        const deskCall = { id: `${REC_CALL_PREFIX}_1`, type: 'function', function: { name: 'quote', arguments: JSON.stringify(args) } };
+        const result = runTool(desk, deskCall, messages);
+        if (result.ok) {
+          messages.push({ role: 'assistant', content: null, tool_calls: [deskCall] }, { role: 'tool', tool_call_id: deskCall.id, content: JSON.stringify(result) });
+          toolCalls.push({ name: 'recommend', arguments: deskCall.function.arguments, result: { ok: true, ...rec, quote: result } });
+        }
+      }
       for (let round = 0; round < maxRounds; round += 1) {
         const out = await model.complete({ messages, tools: CHAT_TOOLS });
         modelId = out.modelId;

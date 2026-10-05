@@ -36,3 +36,31 @@ export function goalFromText(text) {
 
 /** Whether the customer brought up LinkedIn themselves (the career pack row needs that). */
 export const mentionsLinkedIn = (text) => /linked\s*in|لينكد/i.test(String(text ?? ''));
+
+/** The tier id of a tapped years button: the page sends the button's label, so only an exact label counts. A number
+ * of years typed by the customer is not mapped here (the 3-years overlap between the junior and mid labels). */
+export function tierFromText(text) {
+  const t = norm(text);
+  return DATA.tiers.find((x) => [x.name_en, x.name_ar].some((label) => norm(label) === t))?.id ?? null;
+}
+
+const TOP_YEARS = Math.max(...DATA.tiers.map((t) => t.min_years ?? 0));
+/** The quote arguments for a recommendation: years at the tier's lower bound, is_executive only for executive. */
+export function quoteArgsFor(rec) {
+  const tier = DATA.tiers.find((t) => t.id === rec.tier);
+  const services = rec.services.map((s) => s.id);
+  return tier.executive ? { services, years_experience: TOP_YEARS, is_executive: true }
+    : { services, years_experience: tier.min_years, is_executive: false };
+}
+
+export const REC_CALL_PREFIX = 'desk_rec';
+/** The recommendation a conversation is ready for: a goal and a tapped tier in the customer's own messages, and no
+ * recommendation made yet in this session. LinkedIn counts only when the customer said it. Null otherwise. */
+export function pendingRecommendation(messages) {
+  if (messages.some((m) => m.tool_calls?.some((c) => String(c.id).startsWith(REC_CALL_PREFIX)))) return null;
+  const said = messages.filter((m) => m.role === 'user').map((m) => String(m.content ?? ''));
+  const goal = said.map(goalFromText).findLast(Boolean);
+  const tier = said.map(tierFromText).findLast(Boolean);
+  if (!goal || !tier) return null;
+  return recommendation({ goal, tier, linkedin: said.some(mentionsLinkedIn) });
+}

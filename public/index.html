@@ -124,6 +124,9 @@ textarea::placeholder { color: var(--muted); opacity: 1; }
 .card .row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding-block: 3px; }
 .card .row span:last-child, .chip { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .card .tier { color: var(--muted); font-size: 14px; }
+.card .goal { font-weight: 600; margin: 0 0 6px; }
+.card .svc { margin: 2px 0; }
+.card .why { color: var(--muted); font-size: 14px; margin: 6px 0 4px; }
 .card .total { border-block-start: 1px solid var(--line); margin-block-start: 8px; padding-block-start: 10px; font-weight: 600; }
 .card .total span:last-child { font-size: 26px; line-height: 1.1; color: var(--accent); }
 .day { margin: 8px 0 6px; font-size: 14px; color: var(--muted); }
@@ -265,13 +268,13 @@ function logActivity(json) {
 }
 // Widget strings, in the language of the reply they sit under.
 const W = {
-  ar: { quote: 'عرض السعر من جدول الأسعار', tier: 'المستوى', discount: 'خصم الباقة', total: 'الإجمالي', cur: 'ريال',
+  ar: { recommend: 'ما نقترحه لك', quote: 'عرض السعر من جدول الأسعار', tier: 'المستوى', discount: 'خصم الباقة', total: 'الإجمالي', cur: 'ريال',
     times: 'اختر موعد مكالمة البداية', more: (n) => `عرض ${n} مواعيد أخرى`, slotMsg: (l) => `أختار موعد ${l}`,
     level: 'خبرتك', services: 'الخدمات التي تريدها', sendDetails: 'أرسل التفاصيل', needDetails: 'اختر مستواك وخدمة واحدة على الأقل.',
     detailsMsg: (tier, s) => `مستواي: ${tier}. الخدمات: ${s.join('، ')}.`,
     contactTitle: 'بياناتك للحجز', name: 'الاسم', contact: 'البريد الإلكتروني أو رقم الجوال', sendContact: 'أرسل بياناتي',
     needContact: 'اكتب اسمك، ثم بريدًا إلكترونيًا أو رقم جوال صحيحًا.', contactMsg: (n, c) => `اسمي ${n}، وللتواصل: ${c}`, sentAs: (n, c) => `أُرسل: ${n} · ${c}` },
-  en: { quote: 'Quote from the price list', tier: 'Level', discount: 'Bundle discount', total: 'Total', cur: 'SAR',
+  en: { recommend: 'Our suggestion', quote: 'Quote from the price list', tier: 'Level', discount: 'Bundle discount', total: 'Total', cur: 'SAR',
     times: 'Pick a time for the kickoff call', more: (n) => `Show ${n} more times`, slotMsg: (l) => `I'll take ${l}`,
     level: 'Your experience', services: 'Services you want', sendDetails: 'Send details', needDetails: 'Pick your level and at least one service.',
     detailsMsg: (tier, s) => `My level: ${tier}. Services: ${s.join(', ')}.`,
@@ -286,6 +289,14 @@ function row(a, b, cls) { const r = el('div', cls ? `row ${cls}` : 'row'); r.app
 function titled(tag, title) {
   const box = el(tag, 'card'); const h = el('h3', '', title); h.id = nextId();
   box.setAttribute('aria-labelledby', h.id); box.append(h); return box;
+}
+function recommendCard(w, lang) {
+  const s = W[lang]; const c = titled('section', s.recommend); c.classList.add('rec');
+  c.append(el('p', 'goal', w[`goal_line_${lang}`]));
+  for (const sv of w.services) c.append(el('div', 'svc', nm(sv, lang)));
+  c.append(el('p', 'why', w[`why_${lang}`]));
+  c.append(el('div', 'tier', `${s.tier}: ${w[`tier_name_${lang}`] ?? w.tier}`), row(s.total, cash(w.total, lang), 'total'));
+  return c;
 }
 function quoteCard(w, lang) {
   const s = W[lang]; const c = titled('section', s.quote);
@@ -410,7 +421,8 @@ function renderUi(ui, reply) {
   const lang = /[؀-ۿ]/.test(reply ?? '') ? 'ar' : (reply ? 'en' : state.lang);
   const box = el('div', 'widgets'); box.dir = lang === 'ar' ? 'rtl' : 'ltr'; box.lang = lang;
   for (const w of ui) {
-    if (w.type === 'quote') box.append(quoteCard(w, lang));
+    if (w.type === 'recommend') box.append(recommendCard(w, lang));
+    else if (w.type === 'quote') box.append(quoteCard(w, lang));
     else if (w.type === 'slots' && w.slots?.length) box.append(slotSet(w, lang));
     else if (w.type === 'details') box.append(detailsPicker(w, lang));
     else if (w.type === 'contact') box.append(contactForm(lang));
