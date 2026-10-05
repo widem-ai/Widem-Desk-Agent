@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { TOOLS, checkArgs, toJsonSchema } from './tools.mjs';
 import { toWestern, ungrounded } from './guard.mjs';
 import { slotLabels } from './labels.mjs';
-import { latinWords } from './latin.mjs';
+import { latinWords, arabicWords } from './latin.mjs';
 
 const HUMAN = { door: 'human' };
 const DATA = JSON.parse(readFileSync(new URL('../data/demo-business.json', import.meta.url), 'utf8'));
@@ -100,6 +100,23 @@ export function asksForContactFirst(reply, messages) {
   return !messages.some((m) => m.tool_calls?.some((c) => c.function?.name === 'check_availability'));
 }
 
+/** True when a reply asks for name and contact while the newest slots came after the customer's last message:
+ * the slots are on screen but the customer has not picked one yet (playbook guardrail 10). A reply with no slots
+ * shown at all is asksForContactFirst's case, not this one. */
+export function asksForContactBeforePick(reply, messages) {
+  if (typeof reply !== 'string' || !ASKS_NAME.test(reply) || !ASKS_CONTACT.test(reply)) return false;
+  const lastCustomer = messages.findLastIndex((m) => m.role === 'user' && !HIDDEN.has(m));
+  const lastOffer = messages.findLastIndex((m) => m.tool_calls?.some((c) => c.function?.name === 'check_availability'));
+  if (lastOffer <= lastCustomer) return false;
+  // A customer who already named one of the offered times ("Tuesday 10:00 please") has picked.
+  const ids = new Set(messages[lastOffer].tool_calls.map((c) => c.id));
+  const slots = messages.filter((m) => m.role === 'tool' && ids.has(m.tool_call_id))
+    .flatMap((m) => { try { return JSON.parse(m.content).slots ?? []; } catch { return []; } });
+  const said = toWestern(String(messages[lastCustomer]?.content ?? ''));
+  return !slots.some((s) => [s.start.slice(11, 16), s.start.slice(11, 16).replace(/^0/, '')]
+    .some((t) => new RegExp(`(?<![\\d:])${t}(?![\\d])`).test(said)));
+}
+
 // A line that teases more slots ("and more", an ellipsis) instead of listing them.
 const TEASER = /…|\.\.\.|(?:مواعيد|فترات|أوقات)\s+(?:إضافية|أخرى)|وغيرها|\b(?:more|other)\s+(?:slots|times|openings)\b/i;
 
@@ -159,6 +176,7 @@ export function createChat({ desk, model, maxRounds = 6 }) {
       let modelId;
       let corrected = false;
       let nudged = false; // the slots-first note goes to the model at most once per turn
+      let pickNudged = false; // so does the pick-first note
       const visible = () => messages.slice(1).filter((m) => !HIDDEN.has(m));
       // Bookings made in this turn get the conversation up to the reply the customer is about to see.
       const finish = (result) => {
@@ -182,7 +200,7 @@ export function createChat({ desk, model, maxRounds = 6 }) {
         const out = await model.complete({ messages, tools: CHAT_TOOLS });
         modelId = out.modelId;
         // Tool calls go back as they came; a text reply is cleaned before the guard and the customer see it.
-        const message = out.message.tool_calls?.length ? out.message : { ...out.message, content: arabicPunctuation(plainDashes(plainMarkdown(out.message.content))) };
+        const message = out.message.tool_calls?.length ? out.message : { ...out.message, content: arabicWords(arabicPunctuation(plainDashes(plainMarkdown(out.message.content)))) };
         messages.push(message);
         if (!message.tool_calls?.length) {
           // Every SAR amount and time in the reply must be one a desk tool returned in this session.
@@ -199,6 +217,17 @@ export function createChat({ desk, model, maxRounds = 6 }) {
             messages.push(nudge);
             continue;
           }
+          if (!invented.length && !pickNudged && asksForContactBeforePick(message.content, messages)) {
+            // Pick first (playbook v1, guardrail 10): the slots are on screen, so name and contact wait until the
+            // customer picks one. Held back once, like the slots-first hold; a second ask goes out.
+            pickNudged = true;
+            HIDDEN.add(message);
+            const nudge = { role: 'user', content: 'Desk check, not from the customer: the free slots are shown below your '
+              + 'reply. Ask the customer to pick a time only; ask for the name and contact after they pick one.' };
+            HIDDEN.add(nudge);
+            messages.push(nudge);
+            continue;
+          }
           if (!invented.length) {
             // Deterministic post-steps on a reply the guard passed: no teaser lines, and a confirmation that
             // states the slot and price from the book result. Both add only values a tool returned.
@@ -207,7 +236,7 @@ export function createChat({ desk, model, maxRounds = 6 }) {
             const booking = toolCalls.findLast((c) => c.name === 'book' && c.result?.ok)?.result.booking;
             if (booking) reply = withConfirmation(reply, booking, ARABIC.test(text));
             // A reply held back for slots first may have carried the quoted total; the customer still gets it.
-            const quoted = nudged && toolCalls.findLast((c) => c.name === 'quote' && c.result?.ok)?.result;
+            const quoted = (nudged || pickNudged) && toolCalls.findLast((c) => c.name === 'quote' && c.result?.ok)?.result;
             if (quoted) reply = withQuotedTotal(reply, quoted.total, ARABIC.test(text));
             message.content = reply;
             return finish({ reply, toolCalls, modelId, history: visible() });

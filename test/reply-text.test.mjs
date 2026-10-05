@@ -30,25 +30,25 @@ test('Arabic replies use the Arabic comma and say ranges with "إلى"; English 
 });
 
 test('the chat applies both post-steps before the reply reaches the customer and reports Latin words', async () => {
-  const chat = createChat({ desk: createDesk({ store: createMemoryStore() }), model: replyModel('## أهلًا\n- **مرحبا** بك, مكالمة kickoff مدتها 60 دقيقة (3-8 سنوات)') });
+  const chat = createChat({ desk: createDesk({ store: createMemoryStore() }), model: replyModel('## أهلًا\n- **مرحبا** بك, مكالمة senior مدتها 60 دقيقة (3-8 سنوات)') });
   const out = await chat.respond([], 'مرحبا');
-  assert.equal(out.reply, 'أهلًا\nمرحبا بك، مكالمة kickoff مدتها 60 دقيقة (3 إلى 8 سنوات)');
-  assert.deepEqual(out.latin, ['kickoff']);
+  assert.equal(out.reply, 'أهلًا\nمرحبا بك، مكالمة senior مدتها 60 دقيقة (3 إلى 8 سنوات)');
+  assert.deepEqual(out.latin, ['senior']);
   // The history keeps what the customer saw, so the model does not copy its own markdown forward.
   assert.equal(out.history.at(-1).content, out.reply);
 });
 
 test('POST /chat logs Latin words in an Arabic reply and still answers 200 with the reply', async (t) => {
   const warn = t.mock.method(console, 'warn', () => {});
-  const server = createHttpServer({ model: replyModel('مكالمة kickoff مدتها 60 دقيقة') });
+  const server = createHttpServer({ model: replyModel('مكالمة senior مدتها 60 دقيقة') });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   try {
     const res = await fetch(`http://127.0.0.1:${server.address().port}/chat`, { method: 'POST',
       headers: { 'content-type': 'application/json' }, body: JSON.stringify({ message: 'مرحبا' }) });
     assert.equal(res.status, 200);
-    assert.equal((await res.json()).reply, 'مكالمة kickoff مدتها 60 دقيقة');
+    assert.equal((await res.json()).reply, 'مكالمة senior مدتها 60 دقيقة');
     const logged = warn.mock.calls.map((c) => c.arguments.join(' '));
-    assert.ok(logged.some((line) => line.includes('Latin') && line.includes('kickoff')), `logged: ${logged}`);
+    assert.ok(logged.some((line) => line.includes('Latin') && line.includes('senior')), `logged: ${logged}`);
     // The customer's message is not written to the log.
     assert.ok(!logged.some((line) => line.includes('مرحبا')));
   } finally {
@@ -68,4 +68,11 @@ test('Arabic replies name the currency in Arabic: "750 SAR" becomes "750 ريا�
   assert.equal(arabicPunctuation('الإجمالي: 750 SAR'), 'الإجمالي: 750 ريال');
   assert.equal(arabicPunctuation('السعر 1,450 SAR, والحجز BK-0001'), 'السعر 1,450 ريال، والحجز BK-0001');
   assert.equal(arabicPunctuation('Total: 750 SAR'), 'Total: 750 SAR');
+});
+
+test('the chat replaces known Latin slips in an Arabic reply before the customer sees it, and reports only the rest', async () => {
+  const chat = createChat({ desk: createDesk({ store: createMemoryStore() }), model: replyModel('مكالمة kickoff للفئة senior') });
+  const out = await chat.respond([], 'مرحبا');
+  assert.equal(out.reply, 'مكالمة البداية للفئة senior');
+  assert.deepEqual(out.latin, ['senior']);
 });

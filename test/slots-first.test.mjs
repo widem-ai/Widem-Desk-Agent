@@ -37,9 +37,9 @@ test('a reply that asks for name and contact before any slot was shown is held b
   assert.ok(!out.history.some((m) => m.content === ASK_AR || m.content === note.content));
 });
 
-test('after the slots were shown, asking for name and contact passes unchanged', async () => {
+test('after the slots were shown and the customer answered, asking for name and contact passes unchanged', async () => {
   const label = firstLabel();
-  const reply = `أقرب المواعيد:\n${label}\nلحجز الموعد أحتاج اسمك وبريدك.`;
+  const reply = `أقرب المواعيد:\n${label}\nاختر موعدًا.`; // pick first: a same-turn ask is held (slot-pick.test.mjs)
   const model = scriptedModel([toolCall('a', 'check_availability', AVAIL), say(reply)]);
   const out = await createChat({ desk: fresh(), model }).respond([], 'متى المواعيد؟');
   assert.equal(out.reply, reply);
