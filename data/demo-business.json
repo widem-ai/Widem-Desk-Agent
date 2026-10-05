@@ -120,6 +120,24 @@
     "note_en": "Demo rules for a fictional business. The pay button is simulated: no card details are asked for and nothing is charged.",
     "note_ar": "قواعد تجريبية لنشاط وهمي. زر الدفع محاكاة فقط: لا تُطلب بيانات بطاقة ولا يُخصم أي مبلغ."
   },
+  "choices": {
+    "note": "Answer buttons for the desk's discovery questions (desk sales playbook v1). The model names the topic with the ask_choice tool; the desk shows these options. Never budget or contact.",
+    "goal": {
+      "options": [
+        { "id": "new_job", "en": "New job", "ar": "وظيفة جديدة" },
+        { "id": "promotion", "en": "Promotion", "ar": "ترقية" },
+        { "id": "career_switch", "en": "Career switch", "ar": "تغيير المسار المهني" },
+        { "id": "other", "en": "Something else", "ar": "هدف آخر" }
+      ]
+    },
+    "timeline": {
+      "options": [
+        { "id": "this_month", "en": "This month", "ar": "هذا الشهر" },
+        { "id": "one_to_three_months", "en": "In 1 to 3 months", "ar": "خلال شهر إلى ثلاثة أشهر" },
+        { "id": "later", "en": "Later", "ar": "لاحقًا" }
+      ]
+    }
+  },
   "handover": {
     "refusal_codes": ["unknown_service", "unknown_tier", "unknown_addon", "addon_not_applicable"],
     "reasons": ["unknown_service", "unknown_tier", "unknown_addon", "addon_not_applicable", "talk_to_a_person", "discount", "complaint", "hidden_instructions", "out_of_rules"],

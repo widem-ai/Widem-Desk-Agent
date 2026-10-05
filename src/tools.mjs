@@ -1,6 +1,7 @@
 // The five desk tools, defined once. The agent door (MCP) and the human door (chat) both build
 // their tool lists from here, so the two doors cannot drift apart.
 // Parameter types: 'string', 'number' or 'string[]'; optional: true when the caller may leave it out.
+import { askChoice } from './widgets.mjs';
 import { listServices } from './core.mjs';
 
 export const TOOLS = [
@@ -81,6 +82,18 @@ export const TOOLS = [
       contact: { type: 'string', optional: true, describe: 'Email or phone number, if known' },
     },
     run: (desk, args, ctx) => desk.handover(args, ctx),
+  },
+  {
+    name: 'ask_choice',
+    title: 'Show answer buttons',
+    doors: ['human'], // the playbook sells to people only; agents on the MCP door call the desk tools directly
+    description: 'Call it when your reply asks a discovery question, so the customer can tap an answer. Topics: goal '
+      + '(what they want next: new job, promotion, career switch), timeline (when they want it), declined (the customer '
+      + 'clearly said no: reply with one polite line and ask nothing). Never for budget or contact details.',
+    params: {
+      topic: { type: 'string', describe: 'goal | timeline | declined' },
+    },
+    run: (desk, args) => askChoice(args.topic),
   },
   {
     name: 'pay',

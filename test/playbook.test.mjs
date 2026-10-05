@@ -106,13 +106,15 @@ test('T5 a clear no (AR): one polite line, no loop, no tools, no handover', asyn
   assert.ok(!types(t2.ui).includes('slots'), 'no slots after a no');
 });
 
-test('T5 after a clear no the desk shows no contact form', { todo: 'widgetsFor offers the contact form on any toolless turn after slots; code cannot tell a no yet' }, async () => {
+// The model marks a clear no with ask_choice topic declined (slice 2); code then shows no widget that turn.
+test('T5 after a clear no the desk shows no contact form', async () => {
   const s = session();
   await s.turn('كم سعر إعادة كتابة السيرة الذاتية؟ خبرتي سنتين', [
     toolCall('q', 'quote', { services: ['cv_rewrite'], years_experience: 2 }), toolCall('a', 'check_availability', AVAIL),
     sayFrom('quote', (r) => `الإجمالي ${r.total} ريال. اختر موعدًا بالأسفل.`),
   ]);
-  const t2 = await s.turn('لا شكرًا، مو مهتم', [say('لا بأس، شكرًا لتواصلك مع درب.')]);
+  const t2 = await s.turn('لا شكرًا، مو مهتم', [toolCall('d', 'ask_choice', { topic: 'declined' }), say('لا بأس، شكرًا لتواصلك مع درب.')]);
+  assert.deepEqual(t2.tools, ['ask_choice'], 'no quote, slots or handover after a no');
   assert.deepEqual(t2.ui, []);
 });
 

@@ -321,6 +321,17 @@ function slotSet(w, lang) {
   }
   return box;
 }
+function choiceSet(w, lang) {
+  const box = el('div', 'chips answers'); box.setAttribute('role', 'group');
+  w.options.forEach((o) => {
+    const text = o[lang] ?? o.en; const b = el('button', 'chip', text); b.type = 'button'; b.setAttribute('aria-pressed', 'false');
+    b.addEventListener('click', () => {
+      b.setAttribute('aria-pressed', 'true'); box.querySelectorAll('button').forEach((x) => { x.disabled = true; }); send(text);
+    });
+    box.append(b);
+  });
+  return box;
+}
 function choice(type, name, text) {
   const l = el('label', 'opt'); const i = el('input'); i.type = type; i.value = text; if (name) i.name = name;
   l.append(i, el('span', '', text)); return l;
@@ -404,6 +415,7 @@ function renderUi(ui, reply) {
     else if (w.type === 'details') box.append(detailsPicker(w, lang));
     else if (w.type === 'contact') box.append(contactForm(lang));
     else if (w.type === 'pay') box.append(payCard(w, lang));
+    else if (w.type === 'choices' && w.options?.length) box.append(choiceSet(w, lang));
   }
   if (box.children.length) { $('log').append(box); $('log').scrollTop = $('log').scrollHeight; }
 }

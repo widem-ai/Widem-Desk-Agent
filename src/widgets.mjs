@@ -13,6 +13,17 @@ const AV = DATA.availability;
 const clock = (iso) => new Intl.DateTimeFormat('en-GB', { timeZone: AV.timezone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(iso));
 const TIERS = DATA.tiers.map(({ id, name_en, name_ar }) => ({ id, name_en, name_ar }));
 
+const CHOICE_TOPICS = ['goal', 'timeline', 'declined'];
+/** The ask_choice tool: the model names a discovery topic from a fixed list and gets its answer options from the
+ * rules file. "declined" marks a clear no and has no options. Any other topic is refused. */
+export function askChoice(topic) {
+  if (!CHOICE_TOPICS.includes(topic)) {
+    return { ok: false, demo: true, error: { code: 'unknown_topic', message: `Topic must be one of: ${CHOICE_TOPICS.join(', ')}.` } };
+  }
+  const options = topic === 'declined' ? [] : DATA.choices[topic].options.map(({ id, en, ar }) => ({ id, en, ar }));
+  return { ok: true, topic, options };
+}
+
 /** What a session has already been shown: a quote, free slots. */
 export const newWidgetState = () => ({ quoted: false, slotsOffered: false });
 
@@ -34,8 +45,14 @@ export function widgetsFor({ toolCalls = [], state = newWidgetState(), booked, h
   const next = { ...state };
   const ui = [];
   if (state.done) return { ui, state: next };
+  // A clear no (ask_choice "declined"): nothing under the reply that turn, no picker, no slots, no contact form.
+  if (toolCalls.some((c) => c.name === 'ask_choice' && c.result?.ok && c.result.topic === 'declined')) return { ui, state: next };
   for (const c of toolCalls) {
     if (!c.result?.ok) continue;
+    if (c.name === 'ask_choice' && c.result.options?.length) {
+      const old = ui.findIndex((w) => w.type === 'choices'); if (old >= 0) ui.splice(old, 1);
+      ui.push({ type: 'choices', topic: c.result.topic, options: c.result.options });
+    }
     if (c.name === 'quote' && Number.isFinite(c.result.total)) {
       const old = ui.findIndex((w) => w.type === 'quote'); if (old >= 0) ui.splice(old, 1); // the latest quote wins
       ui.push(quoteCard(c.result)); next.quoted = true;

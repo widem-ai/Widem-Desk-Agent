@@ -114,15 +114,17 @@ test('a slow model times out with a model_timeout error the caller can catch', a
   assert.ok(Date.now() - started < 2000);
 });
 
-test('the chat offers the model exactly the agent door tools, with the same parameters, except the agent-only demo pay', async () => {
+test('the chat offers the model exactly the agent door tools, with the same parameters, except the agent-only demo pay and the people-only ask_choice', async () => {
   const { tools } = await agentDoorBooking({ ...ORDER, slot: SLOT, ...CUSTOMER });
   const fromMcp = tools.map((t) => ({ name: t.name, props: Object.keys(t.inputSchema.properties ?? {}).sort(),
     required: [...(t.inputSchema.required ?? [])].sort() })).sort((a, b) => a.name.localeCompare(b.name));
   const fromChat = CHAT_TOOLS.map(({ function: f }) => ({ name: f.name, props: Object.keys(f.parameters.properties).sort(),
     required: [...(f.parameters.required ?? [])].sort() })).sort((a, b) => a.name.localeCompare(b.name));
   // People pay with the button on the page (2026-10-05); only agents get a pay tool.
-  assert.deepEqual(fromChat, fromMcp.filter((t) => t.name !== 'pay'));
+  // The answer buttons (ask_choice, 2026-10-05) are for people only: the playbook does not sell to agents.
+  assert.deepEqual(fromChat.filter((t) => t.name !== 'ask_choice'), fromMcp.filter((t) => t.name !== 'pay'));
   assert.ok(fromMcp.some((t) => t.name === 'pay'));
+  assert.ok(fromChat.some((t) => t.name === 'ask_choice') && !fromMcp.some((t) => t.name === 'ask_choice'), 'ask_choice on the chat door only, checked on the real MCP list');
 });
 
 test('a model that never stops calling tools is cut off at the round cap and handed to a person', async () => {
