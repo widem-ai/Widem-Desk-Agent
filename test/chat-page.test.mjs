@@ -21,13 +21,18 @@ async function withServer(model, fn) {
   try { await fn(`http://127.0.0.1:${server.address().port}`); } finally { await new Promise((r) => server.close(r)); }
 }
 
-test('GET / serves the chat page: Arabic and right-to-left by default, labelled as a fictional demo', async () => {
+// Changed 2026-10-06 (Mohannad): the desk is English only. This test used to require lang="ar" dir="rtl"; it now
+// requires an English, left-to-right page with no language toggle and no Arabic text anywhere in it.
+test('GET / serves the chat page: English and left-to-right only, no language toggle, labelled as a fictional demo', async () => {
   await withServer(null, async (base) => {
     const res = await fetch(`${base}/`);
     assert.equal(res.status, 200);
     assert.match(res.headers.get('content-type'), /^text\/html; charset=utf-8/);
     const html = await res.text();
-    assert.match(html, /<html[^>]*lang="ar"[^>]*dir="rtl"/);
+    assert.match(html, /<html lang="en">/);
+    assert.ok(!/dir="rtl"|'rtl'|id="lang"|\$\('lang'\)|state\.lang|applyLang/.test(html), 'no RTL branch and no language toggle');
+    assert.ok(!/[؀-ۿ]/.test(html), 'no Arabic text in the page');
+    assert.ok(!/\$\{lang\}|\(w, lang\)|_ar\b/.test(html), 'widgets read the English fields only');
     assert.match(html, /fictional/i);
     assert.match(html, /\/chat/);
   });
@@ -60,12 +65,12 @@ test('the page renders the ui widgets from /chat: chips, price card, details pic
 
 test('the page renders the pay step: amount card and the demo button from the widget, POST /chat/pay, no card fields', () => {
   const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
-  assert.match(html, /w\.type === 'pay'\) box\.append\(payCard\(w, lang\)\)/);
+  assert.match(html, /w\.type === 'pay'\) box\.append\(payCard\(w\)\)/);
   const body = html.slice(html.indexOf('function payCard'), html.indexOf('function renderUi'));
   assert.ok(body.length > 100, 'payCard is defined before renderUi');
   assert.match(body, /fetch\('\/chat\/pay'/);
   assert.match(body, /sessionId: state\.sessionId/);
-  assert.match(body, /button_\$\{lang\}/, 'the button label comes from the data file via the widget');
+  assert.match(body, /w\.button_en/, 'the button label comes from the data file via the widget');
   assert.ok(!/el\('(?:input|select|textarea)'|card ?number|iban|cvv/i.test(body), 'no card or bank fields are created');
   assert.match(body, /disabled = true/, 'the button disables after use');
   for (const status of ['409', '400']) assert.ok(body.includes(status), `handles ${status}`);
@@ -77,8 +82,7 @@ test('used forms do not stay as empty fields: a sent contact form becomes a one-
   const body = html.slice(html.indexOf('function contactForm'), html.indexOf('function renderUi'));
   assert.match(body, /f\.replaceWith\(el\('p', 'sent', s\.sentAs\(n, c\)\)\)/);
   assert.match(html, /sentAs: \(n, c\) => `Sent: \$\{n\} · \$\{c\}`/);
-  assert.match(html, /sentAs: \(n, c\) => `أُرسل: \$\{n\} · \$\{c\}`/);
-  assert.match(html, /w\[`held_\$\{lang\}`\]/, 'the pay card shows the hold time from the widget');
+  assert.match(html, /w\.held_en/, 'the pay card shows the hold time from the widget');
 });
 
 // Found 2026-10-05: the activity panel looked empty after the page was opened at phone width and then widened. It is

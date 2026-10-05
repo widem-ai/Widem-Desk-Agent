@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -9,7 +9,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%230f6e5a%22/%3E%3Cpath d=%22M9 22h14M12 22c0-6 4-9 8-11%22 stroke=%22%23f6fbf9%22 stroke-width=%223%22 fill=%22none%22 stroke-linecap=%22round%22/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
   --bg: #eef1f0; --surface: #fbfcfb; --ink: #13212e; --muted: #4c5a64; --line: #d3dad8;
@@ -34,7 +34,7 @@
 html, body { margin: 0; height: 100%; }
 body {
   background: var(--bg); color: var(--ink);
-  font: 400 16px/1.6 "IBM Plex Sans Arabic", system-ui, "Segoe UI", Tahoma, sans-serif;
+  font: 400 16px/1.6 "IBM Plex Sans", system-ui, "Segoe UI", Tahoma, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 button, input, textarea { font: inherit; color: inherit; }
@@ -110,7 +110,7 @@ textarea::placeholder { color: var(--muted); opacity: 1; }
 .act .fact { font-weight: 500; }
 .act .ref {
   display: block; margin-block: 6px 2px; font-size: 34px; font-weight: 600; line-height: 1.1;
-  font-variant-numeric: tabular-nums; letter-spacing: 0.02em; color: var(--accent); direction: ltr; text-align: start;
+  font-variant-numeric: tabular-nums; letter-spacing: 0.02em; color: var(--accent); text-align: start;
 }
 .act .bad { color: var(--warn); }
 .num { font-variant-numeric: tabular-nums; }
@@ -159,7 +159,6 @@ textarea::placeholder { color: var(--muted); opacity: 1; }
   <p class="demo" id="demo"></p>
   <header>
     <div class="brand"><b id="brand"></b><span id="sub"></span></div>
-    <button class="btn" id="lang" type="button"></button>
     <button class="btn" id="reset" type="button"></button>
   </header>
   <main class="desk">
@@ -168,7 +167,7 @@ textarea::placeholder { color: var(--muted); opacity: 1; }
       <div class="log" id="log" role="log" aria-live="polite"></div>
       <form id="form">
         <label class="sr" for="input" id="input-label"></label>
-        <textarea id="input" rows="1" dir="auto" maxlength="2000" autocomplete="off"></textarea>
+        <textarea id="input" rows="1" maxlength="2000" autocomplete="off"></textarea>
         <button class="btn send" id="send" type="submit"></button>
       </form>
     </section>
@@ -179,59 +178,40 @@ textarea::placeholder { color: var(--muted); opacity: 1; }
     </details>
   </main>
 </div>
-<noscript><p style="padding:16px">This chat needs JavaScript. / هذه المحادثة تحتاج إلى JavaScript.</p></noscript>
+<noscript><p style="padding:16px">This chat needs JavaScript.</p></noscript>
 <script>
 const STR = {
-  ar: {
-    demo: 'درب شركة وهمية لأغراض العرض فقط. الأسعار والمواعيد هنا للتجربة، ولا يصل أي حجز إلى شخص حقيقي.',
-    brand: 'درب', sub: 'مكتب الاستقبال', lang: 'English', reset: 'محادثة جديدة', chat: 'المحادثة',
-    label: 'رسالتك', placeholder: 'اكتب رسالتك هنا', send: 'إرسال',
-    title: 'كيف نقدر نساعدك في مسارك المهني؟',
-    lead: 'اسأل عن الخدمات والأسعار، أو احجز مكالمة تعارف. المكتب يسعّر من جدول الأسعار مباشرة.',
-    starters: ['أبغى أحجز مراجعة سيرة ذاتية، عندي خبرة ٦ سنوات', 'كم سعر باقة السيرة الذاتية مع لينكدإن؟', 'ممكن خصم؟'],
-    typing: 'المكتب يكتب', act: 'ما يحدث في المكتب', hint: 'كل ما يفعله المكتب خلف الرد يظهر هنا: التسعير، المواعيد، الحجز، والتحويل لموظف.',
-    quote: 'محرك التسعير', avail: 'فحص المواعيد', book: 'حجز', handover: 'تحويل إلى موظف', list: 'قائمة الخدمات', recommend: 'التوصية', choice: 'أزرار الإجابة',
-    slots: (n) => `${n} موعد متاح`, subtotal: 'قبل الخصم', discount: 'خصم الباقة', total: 'الإجمالي',
-    refused: 'رفض بسبب', sar: 'ريال', turn: (n) => `الرسالة ${n}`,
-    busy: 'المكتب مشغول الآن. انتظر دقيقة ثم أعد الإرسال.', down: 'تعذّر الوصول إلى المكتب. تأكد أن الخادم يعمل ثم أعد الإرسال.',
-    ended: 'انتهت هذه المحادثة. بدأنا محادثة جديدة، أعد إرسال رسالتك.',
-  },
-  en: {
-    demo: 'Darb is a fictional business, for demo only. Prices and times are for testing, and no booking reaches a real person.',
-    brand: 'Darb', sub: 'Front desk', lang: 'العربية', reset: 'New chat', chat: 'Chat',
-    label: 'Your message', placeholder: 'Type your message', send: 'Send',
-    title: 'How can we help with your career?',
-    lead: 'Ask about services and prices, or book a kickoff call. The desk prices straight from the price list.',
-    starters: ['I want to book a CV review, I have 6 years of experience', 'How much is the CV and LinkedIn bundle?', 'Can I get a discount?'],
-    typing: 'The desk is typing', act: 'Desk activity', hint: 'Everything the desk does behind a reply shows here: pricing, free slots, bookings and handovers to a person.',
-    quote: 'Quote engine', avail: 'Free slots checked', book: 'Booked', handover: 'Handed to a person', list: 'Service list', recommend: 'Recommendation', choice: 'Answer buttons',
-    slots: (n) => `${n} free slots`, subtotal: 'Subtotal', discount: 'Bundle discount', total: 'Total',
-    refused: 'Refused:', sar: 'SAR', turn: (n) => `Message ${n}`,
-    busy: 'The desk is busy right now. Wait a minute, then send again.', down: 'Could not reach the desk. Check the server is running, then send again.',
-    ended: 'That chat had ended, so a new one started. Send your message again.',
-  },
+  demo: 'Darb is a fictional business, for demo only. Prices and times are for testing, and no booking reaches a real person.',
+  brand: 'Darb', sub: 'Front desk', reset: 'New chat', chat: 'Chat',
+  label: 'Your message', placeholder: 'Type your message', send: 'Send',
+  title: 'How can we help with your career?',
+  lead: 'Ask about services and prices, or book a kickoff call. The desk prices straight from the price list.',
+  starters: ['I want to book a CV review, I have 6 years of experience', 'How much is the CV and LinkedIn bundle?', 'Can I get a discount?'],
+  typing: 'The desk is typing', act: 'Desk activity', hint: 'Everything the desk does behind a reply shows here: pricing, free slots, bookings and handovers to a person.',
+  quote: 'Quote engine', avail: 'Free slots checked', book: 'Booked', handover: 'Handed to a person', list: 'Service list', recommend: 'Recommendation', choice: 'Answer buttons',
+  slots: (n) => `${n} free slots`, subtotal: 'Subtotal', discount: 'Bundle discount', total: 'Total',
+  refused: 'Refused:', sar: 'SAR', turn: (n) => `Message ${n}`,
+  busy: 'The desk is busy right now. Wait a minute, then send again.', down: 'Could not reach the desk. Check the server is running, then send again.',
+  ended: 'That chat had ended, so a new one started. Send your message again.',
 };
 const $ = (id) => document.getElementById(id);
-const state = { lang: 'ar', sessionId: null, turns: 0, busy: false };
-const t = () => STR[state.lang];
+const state = { sessionId: null, turns: 0, busy: false };
 
-function applyLang() {
-  const s = t();
-  document.documentElement.lang = state.lang;
-  document.documentElement.dir = state.lang === 'ar' ? 'rtl' : 'ltr';
-  for (const k of ['demo', 'brand', 'sub', 'lang', 'reset']) $(k).textContent = s[k];
+function applyText() {
+  const s = STR;
+  for (const k of ['demo', 'brand', 'sub', 'reset']) $(k).textContent = s[k];
   $('chat-title').textContent = s.chat; $('input-label').textContent = s.label;
   $('input').placeholder = s.placeholder; $('send').textContent = s.send;
   $('act-title').textContent = s.act; $('act-hint').textContent = s.hint;
   if (!$('log').children.length || $('log').querySelector('.empty')) renderEmpty();
 }
 function renderEmpty() {
-  const s = t(); const log = $('log'); log.replaceChildren();
+  const s = STR; const log = $('log'); log.replaceChildren();
   const box = el('div', 'empty');
   box.append(el('h1', '', s.title), el('p', '', s.lead));
   const row = el('div', 'starters');
   for (const text of s.starters) {
-    const b = el('button', 'btn', text); b.type = 'button'; b.dir = 'auto';
+    const b = el('button', 'btn', text); b.type = 'button';
     b.addEventListener('click', () => send(text)); row.append(b);
   }
   box.append(row); log.append(box);
@@ -239,17 +219,17 @@ function renderEmpty() {
 function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
 function addMsg(kind, text) {
   const log = $('log'); log.querySelector('.empty')?.remove();
-  const m = el('div', `msg ${kind}`, text); m.dir = 'auto'; log.append(m);
+  const m = el('div', `msg ${kind}`, text); log.append(m);
   log.scrollTop = log.scrollHeight; return m;
 }
-const money = (n) => `${Number(n).toLocaleString('en-US')} ${t().sar}`;
+const money = (n) => `${Number(n).toLocaleString('en-US')} ${STR.sar}`;
 function slotLabel(iso) {
-  try { return new Intl.DateTimeFormat(state.lang === 'ar' ? 'ar-SA-u-nu-latn-ca-gregory' : 'en-GB',
+  try { return new Intl.DateTimeFormat('en-GB',
     { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Riyadh' }).format(new Date(iso)); }
   catch { return iso; }
 }
 function logActivity(json) {
-  const s = t(); const list = $('act-list');
+  const s = STR; const list = $('act-list');
   const items = [...(json.activity ?? [])];
   if (json.handover && !items.some((a) => a.handover === json.handover.id)) items.push({ tool: 'handover', ok: true, handover: json.handover.id });
   for (const a of items) {
@@ -266,60 +246,52 @@ function logActivity(json) {
     list.prepend(li);
   }
 }
-// Widget strings, in the language of the reply they sit under.
-const W = {
-  ar: { recommend: 'ما نقترحه لك', quote: 'عرض السعر من جدول الأسعار', tier: 'المستوى', discount: 'خصم الباقة', total: 'الإجمالي', cur: 'ريال',
-    times: 'اختر موعد مكالمة البداية', more: (n) => `عرض ${n} مواعيد أخرى`, slotMsg: (l) => `أختار موعد ${l}`,
-    level: 'خبرتك', services: 'الخدمات التي تريدها', sendDetails: 'أرسل التفاصيل', needDetails: 'اختر مستواك وخدمة واحدة على الأقل.',
-    detailsMsg: (tier, s) => `مستواي: ${tier}. الخدمات: ${s.join('، ')}.`,
-    contactTitle: 'بياناتك للحجز', name: 'الاسم', contact: 'البريد الإلكتروني أو رقم الجوال', sendContact: 'أرسل بياناتي',
-    needContact: 'اكتب اسمك، ثم بريدًا إلكترونيًا أو رقم جوال صحيحًا.', contactMsg: (n, c) => `اسمي ${n}، وللتواصل: ${c}`, sentAs: (n, c) => `أُرسل: ${n} · ${c}` },
-  en: { recommend: 'Our suggestion', quote: 'Quote from the price list', tier: 'Level', discount: 'Bundle discount', total: 'Total', cur: 'SAR',
+// Widget strings.
+const W = { recommend: 'Our suggestion', quote: 'Quote from the price list', tier: 'Level', discount: 'Bundle discount', total: 'Total', cur: 'SAR',
     times: 'Pick a time for the kickoff call', more: (n) => `Show ${n} more times`, slotMsg: (l) => `I'll take ${l}`,
     level: 'Your experience', services: 'Services you want', sendDetails: 'Send details', needDetails: 'Pick your level and at least one service.',
     detailsMsg: (tier, s) => `My level: ${tier}. Services: ${s.join(', ')}.`,
     contactTitle: 'Your details for the booking', name: 'Name', contact: 'Email or mobile number', sendContact: 'Send my details',
-    needContact: 'Enter your name, then a valid email or mobile number.', contactMsg: (n, c) => `My name is ${n}, contact: ${c}`, sentAs: (n, c) => `Sent: ${n} · ${c}` },
-};
+    needContact: 'Enter your name, then a valid email or mobile number.', contactMsg: (n, c) => `My name is ${n}, contact: ${c}`, sentAs: (n, c) => `Sent: ${n} · ${c}` };
 let uid = 0;
 const nextId = () => `w${++uid}`;
-const nm = (o, lang) => o[`name_${lang}`] ?? o.name_en;
-const cash = (n, lang) => `${Number(n).toLocaleString('en-US')} ${W[lang].cur}`;
+const nm = (o) => o.name_en;
+const cash = (n) => `${Number(n).toLocaleString('en-US')} ${W.cur}`;
 function row(a, b, cls) { const r = el('div', cls ? `row ${cls}` : 'row'); r.append(el('span', '', a), el('span', '', b)); return r; }
 function titled(tag, title) {
   const box = el(tag, 'card'); const h = el('h3', '', title); h.id = nextId();
   box.setAttribute('aria-labelledby', h.id); box.append(h); return box;
 }
-function recommendCard(w, lang) {
-  const s = W[lang]; const c = titled('section', s.recommend); c.classList.add('rec');
-  c.append(el('p', 'goal', w[`goal_line_${lang}`]));
-  for (const sv of w.services) c.append(el('div', 'svc', nm(sv, lang)));
-  c.append(el('p', 'why', w[`why_${lang}`]));
-  c.append(el('div', 'tier', `${s.tier}: ${w[`tier_name_${lang}`] ?? w.tier}`), row(s.total, cash(w.total, lang), 'total'));
+function recommendCard(w) {
+  const s = W; const c = titled('section', s.recommend); c.classList.add('rec');
+  c.append(el('p', 'goal', w.goal_line_en));
+  for (const sv of w.services) c.append(el('div', 'svc', nm(sv)));
+  c.append(el('p', 'why', w.why_en));
+  c.append(el('div', 'tier', `${s.tier}: ${w.tier_name_en ?? w.tier}`), row(s.total, cash(w.total), 'total'));
   return c;
 }
-function quoteCard(w, lang) {
-  const s = W[lang]; const c = titled('section', s.quote);
-  for (const l of w.lines) c.append(row(nm(l, lang), cash(l.price, lang)));
-  for (const a of w.addons ?? []) if (a.price != null) c.append(row(nm(a, lang), cash(a.price, lang)));
-  if (w.discount) c.append(row(s.discount, `- ${cash(w.discount, lang)}`));
-  c.append(el('div', 'tier', `${s.tier}: ${w[`tier_name_${lang}`] ?? w.tier}`), row(s.total, cash(w.total, lang), 'total'));
+function quoteCard(w) {
+  const s = W; const c = titled('section', s.quote);
+  for (const l of w.lines) c.append(row(nm(l), cash(l.price)));
+  for (const a of w.addons ?? []) if (a.price != null) c.append(row(nm(a), cash(a.price)));
+  if (w.discount) c.append(row(s.discount, `- ${cash(w.discount)}`));
+  c.append(el('div', 'tier', `${s.tier}: ${w.tier_name_en ?? w.tier}`), row(s.total, cash(w.total), 'total'));
   return c;
 }
-function slotSet(w, lang) {
-  const s = W[lang]; const box = titled('section', s.times); box.classList.add('slotset');
+function slotSet(w) {
+  const s = W; const box = titled('section', s.times); box.classList.add('slotset');
   let day = null; let chips = null;
   w.slots.forEach((slot, i) => {
-    const label = slot[`label_${lang}`] ?? slot.label_en;
+    const label = slot.label_en;
     const key = slot.start.slice(0, 10);
     if (key !== day) {
-      day = key; const m = label.match(/^(.*)[,،]\s*\d{1,2}:\d{2}/);
+      day = key; const m = label.match(/^(.*),\s*\d{1,2}:\d{2}/);
       const d = el('p', 'day', m ? m[1] : key); d.id = nextId();
       chips = el('div', 'chips'); chips.setAttribute('role', 'group'); chips.setAttribute('aria-labelledby', d.id);
       if (i >= 5) { d.dataset.extra = ''; chips.dataset.extra = ''; }
       box.append(d, chips);
     }
-    const b = el('button', 'chip', slot.start.slice(11, 16)); b.type = 'button'; b.dir = 'ltr';
+    const b = el('button', 'chip', slot.start.slice(11, 16)); b.type = 'button';
     b.setAttribute('aria-label', label); b.setAttribute('aria-pressed', 'false');
     if (i >= 5) b.dataset.extra = '';
     b.addEventListener('click', () => { b.setAttribute('aria-pressed', 'true'); send(s.slotMsg(label)); });
@@ -332,10 +304,10 @@ function slotSet(w, lang) {
   }
   return box;
 }
-function choiceSet(w, lang) {
+function choiceSet(w) {
   const box = el('div', 'chips answers'); box.setAttribute('role', 'group');
   w.options.forEach((o) => {
-    const text = o[lang] ?? o.en; const b = el('button', 'chip', text); b.type = 'button'; b.setAttribute('aria-pressed', 'false');
+    const text = o.en; const b = el('button', 'chip', text); b.type = 'button'; b.setAttribute('aria-pressed', 'false');
     b.addEventListener('click', () => {
       b.setAttribute('aria-pressed', 'true'); box.querySelectorAll('button').forEach((x) => { x.disabled = true; }); send(text);
     });
@@ -347,12 +319,12 @@ function choice(type, name, text) {
   const l = el('label', 'opt'); const i = el('input'); i.type = type; i.value = text; if (name) i.name = name;
   l.append(i, el('span', '', text)); return l;
 }
-function detailsPicker(w, lang) {
-  const s = W[lang]; const f = el('form', 'card picker'); f.noValidate = true; const group = nextId();
+function detailsPicker(w) {
+  const s = W; const f = el('form', 'card picker'); f.noValidate = true; const group = nextId();
   const tiers = el('fieldset'); tiers.append(el('legend', '', s.level));
-  for (const tr of w.tiers) tiers.append(choice('radio', group, nm(tr, lang)));
+  for (const tr of w.tiers) tiers.append(choice('radio', group, nm(tr)));
   const svcs = el('fieldset'); svcs.append(el('legend', '', s.services));
-  for (const sv of w.services) svcs.append(choice('checkbox', '', nm(sv, lang)));
+  for (const sv of w.services) svcs.append(choice('checkbox', '', nm(sv)));
   const err = el('p', 'err'); err.setAttribute('role', 'alert');
   const go = el('button', 'btn go', s.sendDetails); go.type = 'submit';
   f.append(tiers, svcs, err, go);
@@ -364,11 +336,11 @@ function detailsPicker(w, lang) {
   });
   return f;
 }
-function contactForm(lang) {
-  const s = W[lang]; const f = titled('form', s.contactTitle); f.classList.add('picker'); f.noValidate = true;
+function contactForm() {
+  const s = W; const f = titled('form', s.contactTitle); f.classList.add('picker'); f.noValidate = true;
   const field = (label, ac) => {
     const id = nextId(); const d = el('div', 'field'); const l = el('label', '', label); l.htmlFor = id;
-    const i = el('input'); i.id = id; i.type = 'text'; i.autocomplete = ac; i.dir = 'auto'; d.append(l, i); f.append(d); return i;
+    const i = el('input'); i.id = id; i.type = 'text'; i.autocomplete = ac; d.append(l, i); f.append(d); return i;
   };
   const name = field(s.name, 'name'); const contact = field(s.contact, 'email');
   const err = el('p', 'err'); err.setAttribute('role', 'alert');
@@ -384,19 +356,15 @@ function contactForm(lang) {
 }
 // The pay step (demo): the amount and reference from the booking, and a simulated button whose label and note come
 // from the data file. No card or bank fields; the server pays the booking this session holds, never one sent from here.
-const PAY_TEXT = {
-  en: { title: 'Pay to confirm your call', ref: 'Booking', amount: 'Amount', ended: 'This chat has ended. Start a new chat to book again.',
-    settled: 'Nothing is waiting for payment in this chat.', down: 'The payment did not go through just now. Please press the button again.' },
-  ar: { title: 'ادفع لتأكيد مكالمتك', ref: 'الحجز', amount: 'المبلغ', ended: 'انتهت هذه المحادثة. ابدأ محادثة جديدة للحجز مرة أخرى.',
-    settled: 'لا يوجد ما ينتظر الدفع في هذه المحادثة.', down: 'لم يتم الدفع الآن. اضغط الزر مرة أخرى من فضلك.' },
-};
-function payCard(w, lang) {
-  const s = PAY_TEXT[lang]; const c = titled('section', s.title); c.classList.add('pay');
-  c.append(row(s.ref, w.reference), row(s.amount, cash(w.amount, lang), 'total'));
-  if (w[`held_${lang}`]) c.append(el('p', 'tier', w[`held_${lang}`]));
-  c.append(el('p', 'tier', w[`note_${lang}`] ?? w.note_en));
+const PAY_TEXT = { title: 'Pay to confirm your call', ref: 'Booking', amount: 'Amount', ended: 'This chat has ended. Start a new chat to book again.',
+    settled: 'Nothing is waiting for payment in this chat.', down: 'The payment did not go through just now. Please press the button again.' };
+function payCard(w) {
+  const s = PAY_TEXT; const c = titled('section', s.title); c.classList.add('pay');
+  c.append(row(s.ref, w.reference), row(s.amount, cash(w.amount), 'total'));
+  if (w.held_en) c.append(el('p', 'tier', w.held_en));
+  c.append(el('p', 'tier', w.note_en));
   const err = el('p', 'err'); err.setAttribute('role', 'alert');
-  const go = el('button', 'btn go', w[`button_${lang}`] ?? w.button_en); go.type = 'button';
+  const go = el('button', 'btn go', w.button_en); go.type = 'button';
   go.addEventListener('click', async () => {
     if (go.disabled || state.busy) return;
     go.disabled = true; err.textContent = '';
@@ -416,18 +384,17 @@ function payCard(w, lang) {
   c.append(err, go);
   return c;
 }
-function renderUi(ui, reply) {
+function renderUi(ui) {
   if (!Array.isArray(ui) || !ui.length) return;
-  const lang = /[؀-ۿ]/.test(reply ?? '') ? 'ar' : (reply ? 'en' : state.lang);
-  const box = el('div', 'widgets'); box.dir = lang === 'ar' ? 'rtl' : 'ltr'; box.lang = lang;
+  const box = el('div', 'widgets');
   for (const w of ui) {
-    if (w.type === 'recommend') box.append(recommendCard(w, lang));
-    else if (w.type === 'quote') box.append(quoteCard(w, lang));
-    else if (w.type === 'slots' && w.slots?.length) box.append(slotSet(w, lang));
-    else if (w.type === 'details') box.append(detailsPicker(w, lang));
-    else if (w.type === 'contact') box.append(contactForm(lang));
-    else if (w.type === 'pay') box.append(payCard(w, lang));
-    else if (w.type === 'choices' && w.options?.length) box.append(choiceSet(w, lang));
+    if (w.type === 'recommend') box.append(recommendCard(w));
+    else if (w.type === 'quote') box.append(quoteCard(w));
+    else if (w.type === 'slots' && w.slots?.length) box.append(slotSet(w));
+    else if (w.type === 'details') box.append(detailsPicker(w));
+    else if (w.type === 'contact') box.append(contactForm());
+    else if (w.type === 'pay') box.append(payCard(w));
+    else if (w.type === 'choices' && w.options?.length) box.append(choiceSet(w));
   }
   if (box.children.length) { $('log').append(box); $('log').scrollTop = $('log').scrollHeight; }
 }
@@ -436,21 +403,21 @@ async function send(text) {
   state.busy = true; $('send').disabled = true;
   for (const w of document.querySelectorAll('.widgets:not([inert])')) w.inert = true; // an answer moves the chat on
   addMsg('you', text); $('input').value = ''; resize();
-  const typing = el('div', 'typing', t().typing); $('log').append(typing); $('log').scrollTop = $('log').scrollHeight;
+  const typing = el('div', 'typing', STR.typing); $('log').append(typing); $('log').scrollTop = $('log').scrollHeight;
   try {
     const res = await fetch('/chat', { method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify(state.sessionId ? { sessionId: state.sessionId, message: text } : { message: text }) });
     const json = await res.json().catch(() => ({}));
     typing.remove();
-    if (json.error?.code === 'unknown_session') { state.sessionId = null; addMsg('note', t().ended); return; }
+    if (json.error?.code === 'unknown_session') { state.sessionId = null; addMsg('note', STR.ended); return; }
     if (json.sessionId) state.sessionId = json.sessionId;
     if (json.reply) addMsg('desk-msg', json.reply);
-    if (res.ok) renderUi(json.ui, json.reply);
-    if (res.status === 429 && !json.reply) addMsg('note', t().busy);
-    if (!res.ok && !json.reply) addMsg('note', t().down);
+    if (res.ok) renderUi(json.ui);
+    if (res.status === 429 && !json.reply) addMsg('note', STR.busy);
+    if (!res.ok && !json.reply) addMsg('note', STR.down);
     if (res.ok) { state.turns += 1; logActivity(json); }
   } catch {
-    typing.remove(); addMsg('note', t().down);
+    typing.remove(); addMsg('note', STR.down);
   } finally {
     state.busy = false; $('send').disabled = false; $('input').focus();
   }
@@ -460,17 +427,15 @@ function resize() { const i = $('input'); i.style.height = 'auto'; i.style.heigh
 $('form').addEventListener('submit', (e) => { e.preventDefault(); send($('input').value); });
 $('input').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send($('input').value); } });
 $('input').addEventListener('input', resize);
-$('lang').addEventListener('click', () => { state.lang = state.lang === 'ar' ? 'en' : 'ar'; applyLang(); });
 $('reset').addEventListener('click', () => { state.sessionId = null; state.turns = 0; $('act-list').replaceChildren(); $('log').replaceChildren(); renderEmpty(); $('input').focus(); });
 const params = new URLSearchParams(location.search);
-if (params.get('lang') === 'en') state.lang = 'en';
 if (params.get('theme') === 'dark' || params.get('theme') === 'light') document.documentElement.dataset.theme = params.get('theme');
 // The activity panel is open on wide screens and folded on phones, and follows the width when it changes
 // (it once stayed folded after a phone-width load was widened, which looked like an empty panel).
 const wide = matchMedia('(min-width: 900px)');
 $('act').open = wide.matches;
 wide.addEventListener('change', (e) => { $('act').open = e.matches; });
-applyLang();
+applyText();
 </script>
 </body>
 </html>

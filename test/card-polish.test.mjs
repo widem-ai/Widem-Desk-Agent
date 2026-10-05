@@ -56,9 +56,9 @@ test('over HTTP: the turn with the card goes out trimmed, and the card\'s tier l
   } finally { server.close(); }
 });
 
-test('the activity panel names recommend and ask_choice in both languages', () => {
+// Changed 2026-10-06: the page is English only, so the Arabic labels are gone (the English pair is still required).
+test('the activity panel names recommend and ask_choice', () => {
   const page = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   assert.match(page, /recommend: 'recommend', ask_choice: 'choice'/);
-  assert.match(page, /recommend: 'التوصية', choice: 'أزرار الإجابة'/);
   assert.match(page, /recommend: 'Recommendation', choice: 'Answer buttons'/);
 });
