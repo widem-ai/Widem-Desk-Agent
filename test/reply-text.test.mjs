@@ -63,3 +63,9 @@ test('an English reply logs nothing', async (t) => {
   assert.deepEqual(out.latin, []);
   assert.equal(warn.mock.callCount(), 0);
 });
+
+test('Arabic replies name the currency in Arabic: "750 SAR" becomes "750 ريال"; English keeps SAR', () => {
+  assert.equal(arabicPunctuation('الإجمالي: 750 SAR'), 'الإجمالي: 750 ريال');
+  assert.equal(arabicPunctuation('السعر 1,450 SAR, والحجز BK-0001'), 'السعر 1,450 ريال، والحجز BK-0001');
+  assert.equal(arabicPunctuation('Total: 750 SAR'), 'Total: 750 SAR');
+});

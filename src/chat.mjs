@@ -71,13 +71,21 @@ export function plainMarkdown(text) {
     .replace(/[ \t]+$/gm, '');
 }
 
-/** Arabic punctuation in an Arabic reply: the Arabic comma (not between digits, where it groups thousands) and a
- * hyphen range of numbers or times ("3-8", "10:00-11:00") said with "إلى". Dates and references stay. */
+/** Arabic punctuation in an Arabic reply: the Arabic comma (not between digits, where it groups thousands), a
+ * hyphen range of numbers or times ("3-8", "10:00-11:00") said with "إلى", and SAR as "ريال". Dates and references stay. */
 export function arabicPunctuation(text) {
   if (typeof text !== 'string' || !ARABIC.test(text)) return text;
   return text
+    .replace(/\bSAR\b/g, 'ريال')
     .replace(/(?<![\d-])(\d{1,2}(?::\d{2})?)\s*-\s*(\d{1,2}(?::\d{2})?)(?![\d-])/g, '$1 إلى $2')
     .replace(/,/g, (comma, i, s) => (/\d/.test(s[i - 1] ?? '') && /\d/.test(s[i + 1] ?? '') ? comma : '،'));
+}
+
+/** Make sure a reply states the quoted total, taken from the quote result, not the model's text. Used after a
+ * reply was held back for slots first, so the price it carried is not lost. */
+export function withQuotedTotal(reply, total, arabic) {
+  if (toWestern(reply).includes(String(total))) return reply;
+  return `${arabic ? `السعر الإجمالي: ${total} ريال.` : `Total: ${total} SAR.`}\n\n${reply}`;
 }
 
 // A reply that asks the customer for their name and a contact (both), in Arabic or English.
@@ -196,6 +204,9 @@ export function createChat({ desk, model, maxRounds = 6 }) {
             if (toolCalls.some((c) => c.name === 'check_availability')) reply = dropTeasers(reply);
             const booking = toolCalls.findLast((c) => c.name === 'book' && c.result?.ok)?.result.booking;
             if (booking) reply = withConfirmation(reply, booking, ARABIC.test(text));
+            // A reply held back for slots first may have carried the quoted total; the customer still gets it.
+            const quoted = nudged && toolCalls.findLast((c) => c.name === 'quote' && c.result?.ok)?.result;
+            if (quoted) reply = withQuotedTotal(reply, quoted.total, ARABIC.test(text));
             message.content = reply;
             return finish({ reply, toolCalls, modelId, history: visible() });
           }

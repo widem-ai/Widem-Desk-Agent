@@ -70,3 +70,31 @@ test('a reply that asks for nothing passes on the first round', async () => {
   assert.equal((await createChat({ desk: fresh(), model: greet }).respond([], 'مرحبا')).reply, 'أهلًا، ما اسمك الكريم؟');
   assert.equal(greet.seen.length, 1);
 });
+
+// The run-4 regression (2026-10-05): the held-back reply stated the quoted price, the model's next reply listed
+// the slots and dropped it. The customer must still see the total, taken from the quote result.
+const ORDER = { services: ['cv_rewrite', 'cover_letter'], years_experience: 5, is_executive: false };
+
+test('a reply held back for slots-first still carries the quoted total, from the quote result', async () => {
+  const label = firstLabel();
+  const slotsOnly = `المواعيد المتاحة:\n${label}\nاختر موعدًا وأرسل اسمك وبريدك.`;
+  const model = scriptedModel([toolCall('q', 'quote', ORDER), say('السعر 750 ريال. أرسل اسمك وبريدك لأعرض المواعيد.'),
+    toolCall('a', 'check_availability', AVAIL), say(slotsOnly)]);
+  const out = await createChat({ desk: fresh(), model }).respond([], 'كم سعر السيرة الذاتية مع خطاب التقديم؟ خبرتي 5 سنوات');
+  assert.equal(out.reply, `السعر الإجمالي: 750 ريال.\n\n${slotsOnly}`);
+  const en = scriptedModel([toolCall('q', 'quote', ORDER), say('It is 750 SAR. Send your name and email for the times.'),
+    toolCall('a', 'check_availability', AVAIL), say('Free: Tuesday 10:00 to 11:00. Which one?')]);
+  const outEn = await createChat({ desk: fresh(), model: en }).respond([], 'Price for CV and cover letter? 5 years.');
+  assert.equal(outEn.reply, 'Total: 750 SAR.\n\nFree: Tuesday 10:00 to 11:00. Which one?');
+});
+
+test('the total is not added twice when the reply after the hold states it, nor to a reply that was not held back', async () => {
+  const label = firstLabel();
+  const withPrice = `الإجمالي 750 ريال.\n${label}`;
+  const held = scriptedModel([toolCall('q', 'quote', ORDER), say('السعر 750 ريال. أرسل اسمك وبريدك.'),
+    toolCall('a', 'check_availability', AVAIL), say(withPrice)]);
+  assert.equal((await createChat({ desk: fresh(), model: held }).respond([], 'كم السعر؟')).reply, withPrice);
+  const plain = `المواعيد:\n${label}`;
+  const notHeld = scriptedModel([toolCall('q', 'quote', ORDER), toolCall('a', 'check_availability', AVAIL), say(plain)]);
+  assert.equal((await createChat({ desk: fresh(), model: notHeld }).respond([], 'متى؟')).reply, plain);
+});
