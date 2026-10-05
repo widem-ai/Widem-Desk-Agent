@@ -106,3 +106,13 @@ test('a reply that says the call is free is stopped like an invented price: corr
   assert.equal(out.guarded, true);
   assert.equal(out.reply, DATA.handover.tell_customer_ar);
 });
+
+test('the prompt and the book tool tell the model a booking is held until paid and to point to the pay button', async () => {
+  const { SYSTEM_PROMPT } = await import('../src/chat.mjs');
+  const { TOOLS } = await import('../src/tools.mjs');
+  for (const text of [SYSTEM_PROMPT, TOOLS.find((t) => t.name === 'book').description]) {
+    assert.match(text, /held until (?:it is )?paid/i);
+    assert.match(text, /pay button below/i);
+  }
+  assert.match(SYSTEM_PROMPT, /never say .*booked.* before/i);
+});

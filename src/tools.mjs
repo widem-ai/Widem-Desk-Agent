@@ -51,7 +51,8 @@ export const TOOLS = [
     description: 'Book one customer into a free slot from check_availability. Pass the same services, experience and '
       + 'add-ons you quoted, the slot start exactly as returned, and the customer name and a contact (email or '
       + 'phone). The order is priced again by the same rules and the price is stored with the booking. Returns '
-      + 'a booking reference, or a refusal with a reason code (slot_taken: pick another free slot).',
+      + 'a booking reference, or a refusal with a reason code (slot_taken: pick another free slot). The booking is held '
+      + 'until it is paid: tell the customer to use the pay button below; it is confirmed only once paid.',
     params: {
       services: { type: 'string[]', describe: 'Service ids from list_services' },
       years_experience: { type: 'number', describe: 'Years of work experience the customer told you, e.g. 12. '

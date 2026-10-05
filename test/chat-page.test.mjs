@@ -1,4 +1,5 @@
 // The chat page for people (slice 3 prototype): GET / serves the page; POST /chat also returns
+import { readFileSync } from 'node:fs';
 // what the desk did under the hood (activity), so the page can show the quote engine and handover working.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -55,4 +56,17 @@ test('the page renders the ui widgets from /chat: chips, price card, details pic
   assert.match(html, /renderUi\(json\.ui/);
   assert.match(html, /choice\('radio'/); assert.match(html, /choice\('checkbox'/);
   assert.match(html, /aria-expanded/);
+});
+
+test('the page renders the pay step: amount card and the demo button from the widget, POST /chat/pay, no card fields', () => {
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  assert.match(html, /w\.type === 'pay'\) box\.append\(payCard\(w, lang\)\)/);
+  const body = html.slice(html.indexOf('function payCard'), html.indexOf('function renderUi'));
+  assert.ok(body.length > 100, 'payCard is defined before renderUi');
+  assert.match(body, /fetch\('\/chat\/pay'/);
+  assert.match(body, /sessionId: state\.sessionId/);
+  assert.match(body, /button_\$\{lang\}/, 'the button label comes from the data file via the widget');
+  assert.ok(!/el('(?:input|select|textarea)'|card ?number|iban|cvv/i.test(body), 'no card or bank fields are created');
+  assert.match(body, /disabled = true/, 'the button disables after use');
+  for (const status of ['409', '400']) assert.ok(body.includes(status), `handles ${status}`);
 });

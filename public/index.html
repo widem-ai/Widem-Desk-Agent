@@ -358,6 +358,38 @@ function contactForm(lang) {
   });
   return f;
 }
+// The pay step (demo): the amount and reference from the booking, and a simulated button whose label and note come
+// from the data file. No card or bank fields; the server pays the booking this session holds, never one sent from here.
+const PAY_TEXT = {
+  en: { title: 'Pay to confirm your call', ref: 'Booking', amount: 'Amount', ended: 'This chat has ended. Start a new chat to book again.',
+    settled: 'Nothing is waiting for payment in this chat.', down: 'The payment did not go through just now. Please press the button again.' },
+  ar: { title: 'ادفع لتأكيد مكالمتك', ref: 'الحجز', amount: 'المبلغ', ended: 'انتهت هذه المحادثة. ابدأ محادثة جديدة للحجز مرة أخرى.',
+    settled: 'لا يوجد ما ينتظر الدفع في هذه المحادثة.', down: 'لم يتم الدفع الآن. اضغط الزر مرة أخرى من فضلك.' },
+};
+function payCard(w, lang) {
+  const s = PAY_TEXT[lang]; const c = titled('section', s.title); c.classList.add('pay');
+  c.append(row(s.ref, w.reference), row(s.amount, cash(w.amount, lang), 'total'), el('p', 'tier', w[`note_${lang}`] ?? w.note_en));
+  const err = el('p', 'err'); err.setAttribute('role', 'alert');
+  const go = el('button', 'btn go', w[`button_${lang}`] ?? w.button_en); go.type = 'button';
+  go.addEventListener('click', async () => {
+    if (go.disabled || state.busy) return;
+    go.disabled = true; err.textContent = '';
+    try {
+      const res = await fetch('/chat/pay', { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: state.sessionId }) });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok) { // paid, or the hold ran out: either way the desk says so and this card is done
+        if (json.reply) addMsg('desk-msg', json.reply);
+        c.closest('.widgets').inert = true; $('input').focus(); return;
+      }
+      if (res.status === 409) { err.textContent = s.settled; return; }
+      if (res.status === 400) { state.sessionId = null; err.textContent = s.ended; return; }
+      err.textContent = s.down; go.disabled = false; // 429 or a server error: the press can be tried again
+    } catch { err.textContent = s.down; go.disabled = false; }
+  });
+  c.append(err, go);
+  return c;
+}
 function renderUi(ui, reply) {
   if (!Array.isArray(ui) || !ui.length) return;
   const lang = /[؀-ۿ]/.test(reply ?? '') ? 'ar' : (reply ? 'en' : state.lang);
@@ -367,6 +399,7 @@ function renderUi(ui, reply) {
     else if (w.type === 'slots' && w.slots?.length) box.append(slotSet(w, lang));
     else if (w.type === 'details') box.append(detailsPicker(w, lang));
     else if (w.type === 'contact') box.append(contactForm(lang));
+    else if (w.type === 'pay') box.append(payCard(w, lang));
   }
   if (box.children.length) { $('log').append(box); $('log').scrollTop = $('log').scrollHeight; }
 }

@@ -31,6 +31,8 @@ export const SYSTEM_PROMPT = [
   '5. Show the free slots first. Ask for the customer name and a contact (email or phone) after that, before booking.',
   '6. The page shows each quote as a price card and offers pickers and a contact form, so keep each reply to one or',
   'two short sentences: say the total, then ask for the one thing you need next.',
+  '7. Payment is taken at booking. A booking is held until it is paid: after book, point the customer to the pay button below.',
+  'Never say the customer is booked or confirmed before the payment, and never say the call is free or that nothing is due now.',
 ].join('\n');
 
 /** Tool schemas for an OpenAI-compatible chat completions call, built from the shared definitions. */
