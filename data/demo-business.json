@@ -120,6 +120,20 @@
     "note_en": "Demo rules for a fictional business. The pay button is simulated: no card details are asked for and nothing is charged.",
     "note_ar": "قواعد تجريبية لنشاط وهمي. زر الدفع محاكاة فقط: لا تُطلب بيانات بطاقة ولا يُخصم أي مبلغ."
   },
+  "fit": {
+    "status": "default",
+    "note": "Default mapping from desk sales playbook v1 (stage 4), not yet confirmed by Mohannad. The desk recommends one option per customer from these rules and prices it only with quote.",
+    "rules": [
+      { "when": "Applying to other employers now and both CV and LinkedIn need work", "recommend": "the career pack (CV rewrite, LinkedIn profile, cover letter); do not push it if they said LinkedIn is fine", "services": ["cv_rewrite", "linkedin_profile", "cover_letter"] },
+      { "when": "Applying now through portals and LinkedIn is fine", "recommend": "CV rewrite, plus a cover letter only if they write letters; do not add LinkedIn to reach the pack", "services": ["cv_rewrite"] },
+      { "when": "Career switch", "recommend": "CV rewrite for the target roles, or the career pack if they will apply widely and use LinkedIn; never promise the switch will work", "services": ["cv_rewrite"] },
+      { "when": "Interview booked", "recommend": "interview coaching only (one 60-minute mock interview with written feedback); no documents unless they said the CV needs work", "services": ["interview_coaching"] },
+      { "when": "Promotion where they work", "recommend": "first ask whether the step is an interview or a CV submission; interview coaching for an interview, CV rewrite for a submission", "services": ["interview_coaching", "cv_rewrite"] },
+      { "when": "Wants recruiters to find them", "recommend": "LinkedIn profile", "services": ["linkedin_profile"] },
+      { "when": "Applies in Arabic too", "recommend": "add the Arabic version add-on to document services only, never with coaching alone", "addons": ["arabic_version"] },
+      { "when": "Needs documents in under 5 working days", "recommend": "add express delivery (one per order); not when there is no date", "addons": ["express"] }
+    ]
+  },
   "choices": {
     "note": "Answer buttons for the desk's discovery questions (desk sales playbook v1). The model names the topic with the ask_choice tool; the desk shows these options. Never budget or contact.",
     "goal": {

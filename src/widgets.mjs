@@ -45,8 +45,15 @@ export function widgetsFor({ toolCalls = [], state = newWidgetState(), booked, h
   const next = { ...state };
   const ui = [];
   if (state.done) return { ui, state: next };
-  // A clear no (ask_choice "declined"): nothing under the reply that turn, no picker, no slots, no contact form.
-  if (toolCalls.some((c) => c.name === 'ask_choice' && c.result?.ok && c.result.topic === 'declined')) return { ui, state: next };
+  // A clear no (ask_choice "declined"): nothing under the reply that turn, no picker, no slots, no contact form, and
+  // the same on later turns (Alfred, 2026-10-05) until the customer asks to book again, which code sees as a quote,
+  // check_availability or book call that succeeded. Then the session sells as before.
+  if (toolCalls.some((c) => c.name === 'ask_choice' && c.result?.ok && c.result.topic === 'declined')) return { ui, state: { ...next, declined: true } };
+  if (state.declined) {
+    const again = booked || toolCalls.some((c) => c.result?.ok && ['quote', 'check_availability', 'book'].includes(c.name));
+    if (!again) return { ui, state: next };
+    next.declined = false;
+  }
   for (const c of toolCalls) {
     if (!c.result?.ok) continue;
     if (c.name === 'ask_choice' && c.result.options?.length) {

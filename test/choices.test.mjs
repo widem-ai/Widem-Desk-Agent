@@ -79,3 +79,26 @@ test('through the chat: a goal question comes back with buttons, and the topic i
   assert.equal(out.reply, 'ما الهدف الأقرب لك الآن؟');
   assert.equal(out.toolCalls[0].result.topic, 'goal');
 });
+
+// Alfred, 2026-10-05: "declined" holds for the rest of the session. No slot, contact, picker or pay widget afterwards,
+// until the customer asks to book again; code sees that as the model calling quote, check_availability or book.
+test('declined holds for the rest of the session: later turns without a booking tool show no widget', () => {
+  let { state } = widgetsFor({ toolCalls: [{ name: 'ask_choice', result: run('declined') }], state: { ...newWidgetState(), quoted: true, slotsOffered: true } });
+  assert.equal(state.declined, true);
+  for (const toolCalls of [[], [{ name: 'list_services', result: { ok: true, services: [] } }], [{ name: 'ask_choice', result: run('goal') }]]) {
+    const w = widgetsFor({ toolCalls, state });
+    assert.deepEqual(w.ui, [], 'no contact form, picker or buttons after a no');
+    assert.equal(w.state.declined, true);
+    state = w.state;
+  }
+});
+
+test('declined resets when the customer asks to book again: slots come back and the state clears', () => {
+  const { state } = widgetsFor({ toolCalls: [{ name: 'ask_choice', result: run('declined') }], state: newWidgetState() });
+  const slots = { ok: true, slots: [{ start: '2026-10-06T10:00:00+03:00', end: '2026-10-06T11:00:00+03:00', label_en: 'Tue, 10:00', label_ar: 'الثلاثاء، 10:00' }] };
+  const w = widgetsFor({ toolCalls: [{ name: 'check_availability', result: slots }], state });
+  assert.deepEqual(types(w.ui), ['slots']);
+  assert.equal(w.state.declined, false);
+  const q = widgetsFor({ toolCalls: [{ name: 'quote', result: { ok: true, total: 350, lines: [] } }], state });
+  assert.deepEqual(types(q.ui), ['quote'], 'a new quote after a no also counts as asking again');
+});
