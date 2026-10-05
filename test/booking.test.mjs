@@ -23,7 +23,7 @@ test('book returns a reference and stores every field the owner needs', () => {
   assert.equal(r.demo, true);
   const b = r.booking;
   assert.equal(b.reference, 'BK-0001');
-  assert.equal(b.status, 'booked');
+  assert.equal(b.status, 'awaiting_payment');
   assert.equal(b.door, 'agent');
   assert.equal(b.created_at, '2026-10-04T05:00:00.000Z');
   assert.deepEqual(b.slot, { start: SLOT, end: '2026-10-05T12:00:00+03:00' });
@@ -150,7 +150,7 @@ test('the store hands out copies: editing a result cannot change what is stored'
   const { desk, store } = newDesk();
   desk.book(order(), { door: 'agent' }).booking.status = 'cancelled';
   store.all('bookings')[0].status = 'cancelled';
-  assert.equal(store.all('bookings')[0].status, 'booked');
+  assert.equal(store.all('bookings')[0].status, 'awaiting_payment');
 });
 
 test('the file store keeps bookings and handovers across a restart', () => {

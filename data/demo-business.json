@@ -104,6 +104,22 @@
     },
     "blocked_dates": ["2026-10-08", "2026-10-22", "2026-11-05"]
   },
+  "payment": {
+    "demo": true,
+    "when": "at_booking",
+    "amount": "quoted_total",
+    "currency": "SAR",
+    "hold_minutes": 30,
+    "reschedule": { "times": 1, "min_hours_before": 24 },
+    "rule_en": "Payment is taken when you book, for the quoted total. The booking is confirmed once it is paid. An unpaid booking holds the time for 30 minutes; after that the time is freed.",
+    "rule_ar": "يتم الدفع عند الحجز بقيمة السعر الإجمالي المعروض. يتأكد الحجز بعد الدفع. الحجز غير المدفوع يحتفظ بالموعد 30 دقيقة، ثم يُتاح الموعد لغيرك.",
+    "reschedule_en": "A paid booking can be moved once, up to 24 hours before the call.",
+    "reschedule_ar": "يمكن تغيير موعد الحجز المدفوع مرة واحدة، حتى قبل 24 ساعة من المكالمة.",
+    "pay_button_en": "Pay (demo, no real charge)",
+    "pay_button_ar": "ادفع (تجريبي، بلا خصم حقيقي)",
+    "note_en": "Demo rules for a fictional business. The pay button is simulated: no card details are asked for and nothing is charged.",
+    "note_ar": "قواعد تجريبية لنشاط وهمي. زر الدفع محاكاة فقط: لا تُطلب بيانات بطاقة ولا يُخصم أي مبلغ."
+  },
   "handover": {
     "refusal_codes": ["unknown_service", "unknown_tier", "unknown_addon", "addon_not_applicable"],
     "reasons": ["unknown_service", "unknown_tier", "unknown_addon", "addon_not_applicable", "talk_to_a_person", "out_of_rules"],

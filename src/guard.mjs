@@ -65,3 +65,18 @@ export function ungrounded(reply, toolResults) {
   for (const m of text.matchAll(HOUR_ONLY)) checkTime(Number(m[1]), '00', m[2]);
   return found;
 }
+
+// Darb takes payment at booking (2026-10-05), so the desk never says the call is free or that nothing is due now.
+// Free *times* are fine ("pick a free time"); a free call, booking for free or paying later are not.
+const PAYMENT_CLAIMS = [
+  /\bfree of charge\b|\bfor free\b|\bat no cost\b|\bno charge\b|\bfree (?:kickoff |intro |consultation )?call\b/gi,
+  /\b(?:call|consultation|booking|session|kickoff)\s+(?:is|are)\s+free\b/gi,
+  /\bno payment\b|\bpay later\b|\bwithout pay(?:ing|ment)\b|\bnothing to pay\b|\b(?:don't|do not) (?:need|have) to pay\b/gi,
+  /مجان\S*|(?:بدون|بلا|دون)\s+(?:أي\s+)?(?:دفع|رسوم|تكلفة|مقابل)|(?:الدفع|ادفع|تدفع)\s+لاحق\S*|لا\s+(?:حاجة|داعي)\s+(?:لل|إلى\s+ال)دفع/g,
+];
+
+/** The phrases in a reply that say the call is free or that no payment is due now, in order. [] when there are none. */
+export function paymentClaims(reply) {
+  const text = String(reply ?? '');
+  return PAYMENT_CLAIMS.flatMap((re) => [...text.matchAll(re)].map((m) => m[0]));
+}

@@ -6,6 +6,7 @@ import { slotLabels } from './labels.mjs';
 
 const AV = RULES.availability;
 const HO = RULES.handover;
+const PAY = RULES.payment;
 const DOORS = ['human', 'agent'];
 const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 const DAY_MS = 86_400_000;
@@ -80,8 +81,10 @@ export function createDesk({ store, now = () => new Date() }) {
     return ctx.door;
   }
 
-  const takenStarts = () => new Set(store.all('bookings').filter((b) => b.status === 'booked')
-    .map((b) => Date.parse(b.slot.start)));
+  // A slot is taken by a paid booking, or by one awaiting payment whose hold has not run out (data: payment.hold_minutes).
+  const holds = (b) => b.status === 'paid' || b.status === 'booked'
+    || (b.status === 'awaiting_payment' && Date.parse(b.hold_until) > nowMs());
+  const takenStarts = () => new Set(store.all('bookings').filter(holds).map((b) => Date.parse(b.slot.start)));
 
   /** Is instant t a bookable slot now: on the grid, open, not started, inside the booking window? */
   function bookable(t, current) {
@@ -202,11 +205,28 @@ export function createDesk({ store, now = () => new Date() }) {
         currency: q.currency,
         quote: q,
         slot: { start: formatLocal(t), end: formatLocal(t + SLOT_MS) },
-        status: 'booked',
+        // Payment is taken at booking (Mohannad, 2026-10-05): confirmed only once paid; the hold runs out unpaid.
+        status: 'awaiting_payment',
+        amount_due: q.total,
+        hold_until: new Date(current + PAY.hold_minutes * 60_000).toISOString(),
         transcript: cap(input.transcript, 20_000),
       };
       store.add('bookings', booking);
       return { ok: true, demo: true, booking };
+    },
+
+    /** Demo payment: mark a booking awaiting payment as paid. No card details, nothing charged. Only the door that
+     * booked it may; paying twice changes nothing; a hold that ran out is refused (its slot may be someone else's now). */
+    pay(reference, ctx) {
+      const d = door(ctx);
+      const booking = store.all('bookings').find((b) => b.reference === reference);
+      if (!booking || booking.door !== d) return refuse('unknown_booking', `No ${d} booking ${reference}.`);
+      if (booking.status === 'paid') return { ok: true, demo: true, booking };
+      if (booking.status !== 'awaiting_payment' || !holds(booking)) {
+        return refuse('hold_expired', 'The time was held for payment and the hold ran out. Book a free slot again.');
+      }
+      const paid = store.update('bookings', 'reference', reference, { status: 'paid', paid_at: new Date(nowMs()).toISOString() });
+      return { ok: true, demo: true, booking: paid };
     },
 
     /** Bring a booking's stored conversation up to date (the chat calls it at the end of a turn). Only the door that made it may. */

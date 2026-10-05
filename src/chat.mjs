@@ -2,7 +2,7 @@
 // tools as the agent door, in-process. Every tool result comes from the desk, never from the model.
 import { readFileSync } from 'node:fs';
 import { TOOLS, checkArgs, toJsonSchema } from './tools.mjs';
-import { toWestern, ungrounded } from './guard.mjs';
+import { toWestern, ungrounded, paymentClaims } from './guard.mjs';
 import { slotLabels } from './labels.mjs';
 import { latinWords, arabicWords } from './latin.mjs';
 
@@ -205,7 +205,8 @@ export function createChat({ desk, model, maxRounds = 6 }) {
         if (!message.tool_calls?.length) {
           // Every SAR amount and time in the reply must be one a desk tool returned in this session.
           const results = messages.filter((m) => m.role === 'tool').map((m) => JSON.parse(m.content));
-          const invented = ungrounded(message.content, results);
+          // And no claim that the call is free or that nothing is due now: payment is taken at booking.
+          const invented = [...ungrounded(message.content, results), ...paymentClaims(message.content)];
           if (!invented.length && !nudged && asksForContactFirst(message.content, messages)) {
             // Slots first (Mohannad, 2026-10-05): hold back a reply that asks for name and contact before any slot
             // was shown, once. If the model asks again, that reply goes out; it is not a reason to hand over.

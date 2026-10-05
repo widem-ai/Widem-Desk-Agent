@@ -7,6 +7,7 @@ import { toWestern } from './guard.mjs';
 
 const DATA = JSON.parse(readFileSync(new URL('../data/demo-business.json', import.meta.url), 'utf8'));
 const SERVICES = DATA.services.map(({ id, name_en, name_ar }) => ({ id, name_en, name_ar }));
+const PAY = DATA.payment;
 const TIERS = DATA.tiers.map(({ id, name_en, name_ar }) => ({ id, name_en, name_ar }));
 
 /** What a session has already been shown: a quote, free slots. */
@@ -40,6 +41,13 @@ export function widgetsFor({ toolCalls = [], state = newWidgetState(), booked, h
       const old = ui.findIndex((w) => w.type === 'slots'); if (old >= 0) ui.splice(old, 1);
       ui.push(slotChips(c.result)); next.slotsOffered = true;
     }
+  }
+  // A booking awaiting payment gets the demo pay button (built from the booking: amount, reference; no card fields).
+  const unpaid = booked ?? toolCalls.findLast((c) => c.name === 'book' && c.result?.ok)?.result.booking;
+  if (unpaid?.status === 'awaiting_payment' && !handover) {
+    return { ui: [{ type: 'pay', reference: unpaid.reference, amount: unpaid.amount_due, currency: unpaid.currency,
+      slot: unpaid.slot, hold_until: unpaid.hold_until, button_en: PAY.pay_button_en, button_ar: PAY.pay_button_ar,
+      note_en: PAY.note_en, note_ar: PAY.note_ar }], state: { ...next, awaitingPayment: unpaid.reference, done: true } };
   }
   if (booked || handover || toolCalls.some((c) => c.result?.handover || (c.name === 'book' && c.result?.ok))) {
     return { ui: [], state: { ...next, done: true } };

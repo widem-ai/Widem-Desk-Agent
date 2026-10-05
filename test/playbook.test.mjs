@@ -84,7 +84,9 @@ test('T1 decided buyer (EN): quote and slots in the first reply, name and contac
   assert.equal(t3.booked.reference, t3.toolCalls[0].result.booking.reference);
   assert.equal(t3.booked.price_quoted, quoted.total, 'booked with the same order that was quoted');
   assert.ok(t3.reply.includes(t3.booked.reference));
-  assert.deepEqual(t3.ui, [], 'nothing more to pick or fill after the booking');
+  // Payment is taken at booking (2026-10-05): the only thing left is the demo pay button for this booking.
+  assert.deepEqual(types(t3.ui), ['pay']);
+  assert.equal(t3.ui[0].amount, quoted.total);
 });
 
 test('T5 a clear no (AR): one polite line, no loop, no tools, no handover', async () => {
