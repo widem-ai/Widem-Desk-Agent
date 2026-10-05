@@ -88,10 +88,12 @@ export const TOOLS = [
     title: 'Show answer buttons',
     doors: ['human'], // the playbook sells to people only; agents on the MCP door call the desk tools directly
     description: 'Call it when your reply asks a discovery question, so the customer can tap an answer. Topics: goal '
-      + '(what they want next: new job, promotion, career switch), timeline (when they want it), declined (the customer '
-      + 'clearly said no: reply with one polite line and ask nothing). Never for budget or contact details.',
+      + '(what they want next: new job, promotion, career switch), timeline (when they want it), years (their '
+      + 'experience level: the buttons are the pricing tiers; when they tap one, quote with years_experience at the '
+      + 'tier\'s lower bound, 0 junior, 3 mid, 8 senior, and is_executive true only for the executive button), declined '
+      + '(the customer clearly said no: reply with one polite line and ask nothing). Never for budget or contact details.',
     params: {
-      topic: { type: 'string', describe: 'goal | timeline | declined' },
+      topic: { type: 'string', describe: 'goal | timeline | years | declined' },
     },
     run: (desk, args) => askChoice(args.topic),
   },

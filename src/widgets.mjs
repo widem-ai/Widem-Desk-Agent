@@ -13,14 +13,17 @@ const AV = DATA.availability;
 const clock = (iso) => new Intl.DateTimeFormat('en-GB', { timeZone: AV.timezone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(iso));
 const TIERS = DATA.tiers.map(({ id, name_en, name_ar }) => ({ id, name_en, name_ar }));
 
-const CHOICE_TOPICS = ['goal', 'timeline', 'declined'];
+const CHOICE_TOPICS = ['goal', 'timeline', 'years', 'declined'];
 /** The ask_choice tool: the model names a discovery topic from a fixed list and gets its answer options from the
- * rules file. "declined" marks a clear no and has no options. Any other topic is refused. */
+ * rules file. "years" offers the pricing tiers themselves (executive is its own button). "declined" marks a clear no
+ * and has no options. Any other topic is refused. */
 export function askChoice(topic) {
   if (!CHOICE_TOPICS.includes(topic)) {
     return { ok: false, demo: true, error: { code: 'unknown_topic', message: `Topic must be one of: ${CHOICE_TOPICS.join(', ')}.` } };
   }
-  const options = topic === 'declined' ? [] : DATA.choices[topic].options.map(({ id, en, ar }) => ({ id, en, ar }));
+  const options = topic === 'declined' ? []
+    : topic === 'years' ? TIERS.map(({ id, name_en, name_ar }) => ({ id, en: name_en, ar: name_ar }))
+      : DATA.choices[topic].options.map(({ id, en, ar }) => ({ id, en, ar }));
   return { ok: true, topic, options };
 }
 
@@ -82,7 +85,10 @@ export function widgetsFor({ toolCalls = [], state = newWidgetState(), booked, h
     return { ui: [], state: { ...next, done: true } };
   }
   ui.sort((a, b) => (a.type === 'quote' ? -1 : b.type === 'quote' ? 1 : 0));
-  if (!ui.length && !next.quoted) ui.push({ type: 'details', services: SERVICES, tiers: TIERS });
+  // Any ask_choice call, even a refused topic, makes this a discovery turn: no services-and-tiers picker under a
+  // question (live run 2026-10-05, turn 3, where a refused topic brought the picker back).
+  const discovery = toolCalls.some((c) => c.name === 'ask_choice');
+  if (!ui.length && !next.quoted && !discovery) ui.push({ type: 'details', services: SERVICES, tiers: TIERS });
   else if (!ui.length && next.slotsOffered && next.slotPicked) ui.push({ type: 'contact' }); // only after a pick
   return { ui, state: next };
 }
