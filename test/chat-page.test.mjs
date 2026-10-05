@@ -47,3 +47,12 @@ test('POST /chat reports the desk activity: the quote it priced, with the total 
     assert.equal(q.currency, 'SAR');
   });
 });
+
+test('the page renders the ui widgets from /chat: chips, price card, details picker, contact form', async () => {
+  const { readFileSync } = await import('node:fs');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  for (const t of ['quote', 'slots', 'details', 'contact']) assert.ok(html.includes(`w.type === '${t}'`), t);
+  assert.match(html, /renderUi\(json\.ui/);
+  assert.match(html, /choice\('radio'/); assert.match(html, /choice\('checkbox'/);
+  assert.match(html, /aria-expanded/);
+});

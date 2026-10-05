@@ -114,6 +114,39 @@ textarea::placeholder { color: var(--muted); opacity: 1; }
 }
 .act .bad { color: var(--warn); }
 .num { font-variant-numeric: tabular-nums; }
+/* Widgets under the desk's message: built by the server from tool results, never from the model's words */
+.widgets { align-self: flex-start; width: min(100%, 34rem); display: grid; gap: 10px; }
+.widgets[inert] .go, .widgets[inert] .more { display: none; }
+.card { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+.card h3 { margin: 0 0 8px; font-size: 14px; font-weight: 500; color: var(--muted); }
+.card .row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding-block: 3px; }
+.card .row span:last-child, .chip { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.card .tier { color: var(--muted); font-size: 14px; }
+.card .total { border-block-start: 1px solid var(--line); margin-block-start: 8px; padding-block-start: 10px; font-weight: 600; }
+.card .total span:last-child { font-size: 26px; line-height: 1.1; color: var(--accent); }
+.day { margin: 8px 0 6px; font-size: 14px; color: var(--muted); }
+.day:first-of-type { margin-block-start: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { min-height: 44px; min-width: 76px; padding-inline: 14px; border-radius: 999px; border: 1px solid var(--accent);
+  background: var(--surface); cursor: pointer; font-weight: 500; transition: transform 140ms var(--ease-out), background-color 140ms ease; }
+.chip:active { transform: scale(0.97); }
+@media (hover: hover) and (pointer: fine) { .chip:hover { background: var(--accent-soft); } }
+.chip[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+.slotset:not(.open) [data-extra] { display: none; }
+.more { margin-block-start: 10px; }
+.picker fieldset { border: 0; padding: 0; margin: 0 0 14px; display: grid; gap: 6px; min-width: 0; }
+.picker legend { font-weight: 600; font-size: 15px; padding: 0; margin-block-end: 6px; }
+.opt { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--line);
+  border-radius: 12px; background: var(--surface); cursor: pointer; font-size: 15px; line-height: 1.4; }
+.opt:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.opt input { accent-color: var(--accent); width: 18px; height: 18px; margin: 0; flex: none; }
+.field { display: grid; gap: 4px; margin-block-end: 10px; }
+.field label { font-size: 14px; font-weight: 500; }
+.field input { min-height: 44px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--muted); background: var(--surface); width: 100%; }
+.err { color: var(--warn); font-size: 14px; margin: 0 0 8px; }
+.err:empty { display: none; }
+.go { background: var(--accent); color: var(--on-accent); border-color: transparent; }
+@media (prefers-reduced-motion: no-preference) { .widgets { animation: enter 220ms var(--ease-out) both; } }
 </style>
 </head>
 <body>
@@ -228,9 +261,120 @@ function logActivity(json) {
     list.prepend(li);
   }
 }
+// Widget strings, in the language of the reply they sit under.
+const W = {
+  ar: { quote: 'عرض السعر من جدول الأسعار', tier: 'المستوى', discount: 'خصم الباقة', total: 'الإجمالي', cur: 'ريال',
+    times: 'اختر موعد مكالمة البداية', more: (n) => `عرض ${n} مواعيد أخرى`, slotMsg: (l) => `أختار موعد ${l}`,
+    level: 'خبرتك', services: 'الخدمات التي تريدها', sendDetails: 'أرسل التفاصيل', needDetails: 'اختر مستواك وخدمة واحدة على الأقل.',
+    detailsMsg: (tier, s) => `مستواي: ${tier}. الخدمات: ${s.join('، ')}.`,
+    contactTitle: 'بياناتك للحجز', name: 'الاسم', contact: 'البريد الإلكتروني أو رقم الجوال', sendContact: 'أرسل بياناتي',
+    needContact: 'اكتب اسمك، ثم بريدًا إلكترونيًا أو رقم جوال صحيحًا.', contactMsg: (n, c) => `اسمي ${n}، وللتواصل: ${c}` },
+  en: { quote: 'Quote from the price list', tier: 'Level', discount: 'Bundle discount', total: 'Total', cur: 'SAR',
+    times: 'Pick a time for the kickoff call', more: (n) => `Show ${n} more times`, slotMsg: (l) => `I'll take ${l}`,
+    level: 'Your experience', services: 'Services you want', sendDetails: 'Send details', needDetails: 'Pick your level and at least one service.',
+    detailsMsg: (tier, s) => `My level: ${tier}. Services: ${s.join(', ')}.`,
+    contactTitle: 'Your details for the booking', name: 'Name', contact: 'Email or mobile number', sendContact: 'Send my details',
+    needContact: 'Enter your name, then a valid email or mobile number.', contactMsg: (n, c) => `My name is ${n}, contact: ${c}` },
+};
+let uid = 0;
+const nextId = () => `w${++uid}`;
+const nm = (o, lang) => o[`name_${lang}`] ?? o.name_en;
+const cash = (n, lang) => `${Number(n).toLocaleString('en-US')} ${W[lang].cur}`;
+function row(a, b, cls) { const r = el('div', cls ? `row ${cls}` : 'row'); r.append(el('span', '', a), el('span', '', b)); return r; }
+function titled(tag, title) {
+  const box = el(tag, 'card'); const h = el('h3', '', title); h.id = nextId();
+  box.setAttribute('aria-labelledby', h.id); box.append(h); return box;
+}
+function quoteCard(w, lang) {
+  const s = W[lang]; const c = titled('section', s.quote);
+  for (const l of w.lines) c.append(row(nm(l, lang), cash(l.price, lang)));
+  for (const a of w.addons ?? []) if (a.price != null) c.append(row(nm(a, lang), cash(a.price, lang)));
+  if (w.discount) c.append(row(s.discount, `- ${cash(w.discount, lang)}`));
+  c.append(el('div', 'tier', `${s.tier}: ${w[`tier_name_${lang}`] ?? w.tier}`), row(s.total, cash(w.total, lang), 'total'));
+  return c;
+}
+function slotSet(w, lang) {
+  const s = W[lang]; const box = titled('section', s.times); box.classList.add('slotset');
+  let day = null; let chips = null;
+  w.slots.forEach((slot, i) => {
+    const label = slot[`label_${lang}`] ?? slot.label_en;
+    const key = slot.start.slice(0, 10);
+    if (key !== day) {
+      day = key; const m = label.match(/^(.*)[,،]\s*\d{1,2}:\d{2}/);
+      const d = el('p', 'day', m ? m[1] : key); d.id = nextId();
+      chips = el('div', 'chips'); chips.setAttribute('role', 'group'); chips.setAttribute('aria-labelledby', d.id);
+      if (i >= 5) { d.dataset.extra = ''; chips.dataset.extra = ''; }
+      box.append(d, chips);
+    }
+    const b = el('button', 'chip', slot.start.slice(11, 16)); b.type = 'button'; b.dir = 'ltr';
+    b.setAttribute('aria-label', label); b.setAttribute('aria-pressed', 'false');
+    if (i >= 5) b.dataset.extra = '';
+    b.addEventListener('click', () => { b.setAttribute('aria-pressed', 'true'); send(s.slotMsg(label)); });
+    chips.append(b);
+  });
+  if (w.slots.length > 5) {
+    const more = el('button', 'btn more', s.more(w.slots.length - 5)); more.type = 'button'; more.setAttribute('aria-expanded', 'false');
+    more.addEventListener('click', () => { box.classList.add('open'); more.remove(); box.querySelector('.chip[data-extra]')?.focus(); });
+    box.append(more);
+  }
+  return box;
+}
+function choice(type, name, text) {
+  const l = el('label', 'opt'); const i = el('input'); i.type = type; i.value = text; if (name) i.name = name;
+  l.append(i, el('span', '', text)); return l;
+}
+function detailsPicker(w, lang) {
+  const s = W[lang]; const f = el('form', 'card picker'); f.noValidate = true; const group = nextId();
+  const tiers = el('fieldset'); tiers.append(el('legend', '', s.level));
+  for (const tr of w.tiers) tiers.append(choice('radio', group, nm(tr, lang)));
+  const svcs = el('fieldset'); svcs.append(el('legend', '', s.services));
+  for (const sv of w.services) svcs.append(choice('checkbox', '', nm(sv, lang)));
+  const err = el('p', 'err'); err.setAttribute('role', 'alert');
+  const go = el('button', 'btn go', s.sendDetails); go.type = 'submit';
+  f.append(tiers, svcs, err, go);
+  f.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const tier = tiers.querySelector('input:checked')?.value; const picked = [...svcs.querySelectorAll('input:checked')].map((i) => i.value);
+    if (!tier || !picked.length) { err.textContent = s.needDetails; return; }
+    err.textContent = ''; send(s.detailsMsg(tier, picked));
+  });
+  return f;
+}
+function contactForm(lang) {
+  const s = W[lang]; const f = titled('form', s.contactTitle); f.classList.add('picker'); f.noValidate = true;
+  const field = (label, ac) => {
+    const id = nextId(); const d = el('div', 'field'); const l = el('label', '', label); l.htmlFor = id;
+    const i = el('input'); i.id = id; i.type = 'text'; i.autocomplete = ac; i.dir = 'auto'; d.append(l, i); f.append(d); return i;
+  };
+  const name = field(s.name, 'name'); const contact = field(s.contact, 'email');
+  const err = el('p', 'err'); err.setAttribute('role', 'alert');
+  const go = el('button', 'btn go', s.sendContact); go.type = 'submit';
+  f.append(err, go);
+  f.addEventListener('submit', (e) => {
+    e.preventDefault(); const n = name.value.trim(); const c = contact.value.trim();
+    const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c) || /^\+?[\d\s-]{7,}$/.test(c);
+    if (!n || !ok) { err.textContent = s.needContact; (n ? contact : name).focus(); return; }
+    err.textContent = ''; send(s.contactMsg(n, c));
+  });
+  return f;
+}
+function renderUi(ui, reply) {
+  if (!Array.isArray(ui) || !ui.length) return;
+  const lang = /[؀-ۿ]/.test(reply ?? '') ? 'ar' : (reply ? 'en' : state.lang);
+  const box = el('div', 'widgets'); box.dir = lang === 'ar' ? 'rtl' : 'ltr'; box.lang = lang;
+  for (const w of ui) {
+    if (w.type === 'quote') box.append(quoteCard(w, lang));
+    else if (w.type === 'slots' && w.slots?.length) box.append(slotSet(w, lang));
+    else if (w.type === 'details') box.append(detailsPicker(w, lang));
+    else if (w.type === 'contact') box.append(contactForm(lang));
+  }
+  if (box.children.length) { $('log').append(box); $('log').scrollTop = $('log').scrollHeight; }
+}
 async function send(text) {
   text = text.trim(); if (!text || state.busy) return;
-  state.busy = true; $('send').disabled = true; addMsg('you', text); $('input').value = ''; resize();
+  state.busy = true; $('send').disabled = true;
+  for (const w of document.querySelectorAll('.widgets:not([inert])')) w.inert = true; // an answer moves the chat on
+  addMsg('you', text); $('input').value = ''; resize();
   const typing = el('div', 'typing', t().typing); $('log').append(typing); $('log').scrollTop = $('log').scrollHeight;
   try {
     const res = await fetch('/chat', { method: 'POST', headers: { 'content-type': 'application/json' },
@@ -240,6 +384,7 @@ async function send(text) {
     if (json.error?.code === 'unknown_session') { state.sessionId = null; addMsg('note', t().ended); return; }
     if (json.sessionId) state.sessionId = json.sessionId;
     if (json.reply) addMsg('desk-msg', json.reply);
+    if (res.ok) renderUi(json.ui, json.reply);
     if (res.status === 429 && !json.reply) addMsg('note', t().busy);
     if (!res.ok && !json.reply) addMsg('note', t().down);
     if (res.ok) { state.turns += 1; logActivity(json); }
