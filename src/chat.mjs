@@ -85,7 +85,7 @@ export function arabicPunctuation(text) {
  * reply was held back for slots first, so the price it carried is not lost. */
 export function withQuotedTotal(reply, total, arabic) {
   if (toWestern(reply).includes(String(total))) return reply;
-  return `${arabic ? `السعر الإجمالي: ${total} ريال.` : `Total: ${total} SAR.`}\n\n${reply}`;
+  return `${arabic ? `السعر الإجمالي: ${total} ريال.` : `Total: ${total} SAR.`}\n\n${reply.replace(/^\s+/, '')}`;
 }
 
 // A reply that asks the customer for their name and a contact (both), in Arabic or English.

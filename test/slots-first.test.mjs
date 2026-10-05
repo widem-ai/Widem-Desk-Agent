@@ -98,3 +98,10 @@ test('the total is not added twice when the reply after the hold states it, nor 
   const notHeld = scriptedModel([toolCall('q', 'quote', ORDER), toolCall('a', 'check_availability', AVAIL), say(plain)]);
   assert.equal((await createChat({ desk: fresh(), model: notHeld }).respond([], 'متى؟')).reply, plain);
 });
+
+test('the added total is followed by exactly one blank line, even when the model reply starts with blank lines', async () => {
+  const model = scriptedModel([toolCall('q', 'quote', ORDER), say('السعر 750 ريال. أرسل اسمك وبريدك.'),
+    toolCall('a', 'check_availability', AVAIL), say('\n\nاختر موعدًا من القائمة.')]);
+  const out = await createChat({ desk: fresh(), model }).respond([], 'كم السعر؟');
+  assert.equal(out.reply, 'السعر الإجمالي: 750 ريال.\n\nاختر موعدًا من القائمة.');
+});
