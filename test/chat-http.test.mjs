@@ -231,3 +231,29 @@ test('POST /chat/pay: the demo pay button marks this session\'s booking paid and
     assert.equal((await pay({ sessionId: held.json.sessionId })).status, 409, 'nothing left to pay');
   });
 });
+
+// Live-run fix 2 (2026-10-05) through /chat: the contact form comes only after the customer picks an offered slot,
+// and new slots after a pick reset it. Both paths survived planted breaks until these tests (server wiring, reset).
+test('through /chat: contact form after a pick only, and new slots after a pick reset it', async () => {
+  const model = scriptedModel([
+    toolCall('q', 'quote', { services: ['cv_rewrite'], years_experience: 6 }),
+    toolCall('a', 'check_availability', { from: '2026-10-06', days: 1 }),
+    { role: 'assistant', content: 'Total 550 SAR. Pick a time below.' },
+    { role: 'assistant', content: 'What is your name and email?' },
+    toolCall('a2', 'check_availability', { from: '2026-10-07', days: 3 }),
+    { role: 'assistant', content: 'Pick a time below.' },
+    { role: 'assistant', content: 'Take your time.' },
+  ]);
+  await withServer(model, async ({ customer }) => {
+    const say = customer();
+    const types = (out) => (out.json.ui ?? []).map((w) => w.type);
+    const t1 = await say('CV rewrite, 6 years. How much?');
+    assert.deepEqual(types(t1), ['quote', 'slots']);
+    const t2 = await say("I'll take Tuesday 6 October, 10:00 to 11:00 Riyadh time");
+    assert.deepEqual(types(t2), ['contact'], 'the page chip message is a pick: the form shows');
+    const t3 = await say('Actually, is there another day?');
+    assert.deepEqual(types(t3), ['slots'], 'new slots, no form');
+    const t4 = await say('Hmm, let me see.');
+    assert.ok(!types(t4).includes('contact'), 'the earlier pick does not count for the new slots');
+  });
+});
