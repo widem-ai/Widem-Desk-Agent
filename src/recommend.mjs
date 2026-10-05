@@ -54,6 +54,15 @@ export function quoteArgsFor(rec) {
 }
 
 export const REC_CALL_PREFIX = 'desk_rec';
+
+// Words a customer uses for a service besides its full name, so "عندي مقابلة" names interview coaching.
+const SERVICE_WORDS = { cv_rewrite: /cv|resume|سيرة/i, linkedin_profile: /linked ?in|لينكد/i, cover_letter: /cover letter|خطاب/i,
+  interview_coaching: /interview|مقابل/i };
+/** Whether a customer message names a service, by its name in either language or a common word for it. */
+export function namesService(text, id) {
+  const s = SERVICE.get(id); const t = norm(text);
+  return Boolean(s) && (t.includes(norm(s.name_en)) || t.includes(norm(s.name_ar)) || Boolean(SERVICE_WORDS[id]?.test(t)));
+}
 /** The recommendation a conversation is ready for: a goal and a tapped tier in the customer's own messages, and no
  * recommendation made yet in this session. LinkedIn counts only when the customer said it. Null otherwise. */
 export function pendingRecommendation(messages) {

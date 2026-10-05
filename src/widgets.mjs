@@ -71,7 +71,7 @@ export function widgetsFor({ toolCalls = [], state = newWidgetState(), booked, h
         tier_name_ar: q.tier_name_ar, total: q.total, currency: q.currency ?? DATA.currency, status: r.status, why_status: r.why_status });
       next.quoted = true;
     }
-    if (c.name === 'quote' && Number.isFinite(c.result.total)) {
+    if (c.name === 'quote' && Number.isFinite(c.result.total) && c.keepCard !== false) { // false: the recommendation card stands
       const old = ui.findIndex((w) => w.type === 'quote'); if (old >= 0) ui.splice(old, 1); // the latest quote wins
       ui.push(quoteCard(c.result)); next.quoted = true;
     }

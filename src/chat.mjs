@@ -7,7 +7,7 @@ const TOOLS = toolsFor('human'); // never the agent-only pay tool: people pay wi
 import { toWestern, ungrounded, paymentClaims, statedAmounts } from './guard.mjs';
 import { slotLabels } from './labels.mjs';
 import { latinWords, arabicWords } from './latin.mjs';
-import { pendingRecommendation, quoteArgsFor, REC_CALL_PREFIX } from './recommend.mjs';
+import { pendingRecommendation, quoteArgsFor, REC_CALL_PREFIX, namesService } from './recommend.mjs';
 
 const HUMAN = { door: 'human' };
 const DATA = JSON.parse(readFileSync(new URL('../data/demo-business.json', import.meta.url), 'utf8'));
@@ -177,8 +177,8 @@ function latestResult(messages, name) {
 /** SAR amounts a reply states that are not the latest quote's total or discount, nor the booking's amount. The guard
  * accepts any amount a tool returned in the session, so an old line price said as a new total passed it
  * (live run 2026-10-05: 550, the CV line of a 950 quote, with no quote call for the CV alone). */
-export function staleTotals(reply, messages) {
-  const q = latestResult(messages, 'quote');
+export function staleTotals(reply, messages, pinned) {
+  const q = pinned ?? latestResult(messages, 'quote'); // pinned: the recommendation card's quote this turn
   const b = latestResult(messages, 'book')?.booking;
   const allowed = new Set([q?.total, q?.discount, b?.amount_due, b?.price_quoted].filter(Number.isFinite));
   return statedAmounts(reply).filter((n) => !allowed.has(n));
@@ -257,7 +257,22 @@ export function createChat({ desk, model, maxRounds = 6 }) {
       const picked = pickedOfferedSlot(messages);
       const visible = () => messages.slice(1).filter((m) => !HIDDEN.has(m));
       // Bookings made in this turn get the conversation up to the reply the customer is about to see.
+      // One recommendation (Alfred, 2026-10-05): in the turn the card appears, a quote of the model's keeps its card
+      // and its total only when it adds services the customer's own messages named.
+      const recEntry = () => toolCalls.find((c) => c.name === 'recommend');
+      const keepsCard = (c) => {
+        const r = recEntry(); if (!r) return true;
+        let args; try { args = JSON.parse(c.arguments || '{}'); } catch { return false; }
+        const extra = (args.services ?? []).filter((id) => !r.result.services.some((s) => s.id === id));
+        const said = messages.filter((m) => m.role === 'user' && !HIDDEN.has(m)).map((m) => String(m.content ?? ''));
+        return extra.length > 0 && extra.every((id) => said.some((t) => namesService(t, id)));
+      };
+      const pinnedQuote = () => {
+        const r = recEntry(); const own = toolCalls.findLast((c) => c.name === 'quote' && c.result?.ok);
+        return r && (!own || !keepsCard(own)) ? r.result.quote : undefined;
+      };
       const finish = (result) => {
+        if (recEntry()) for (const c of toolCalls) if (c.name === 'quote') c.keepCard = keepsCard(c);
         let booked;
         for (const c of toolCalls) {
           if (c.name !== 'book' || !c.result?.ok) continue;
@@ -326,7 +341,7 @@ export function createChat({ desk, model, maxRounds = 6 }) {
             messages.push(nudge);
             continue;
           }
-          const stale = invented.length ? [] : staleTotals(message.content, messages);
+          const stale = invented.length ? [] : staleTotals(message.content, messages, pinnedQuote());
           if (stale.length && !priceNudged) {
             // A total that is not the latest quote's (live run 2026-10-05): held back once, like the slots-first hold.
             priceNudged = true;
