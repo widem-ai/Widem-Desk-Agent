@@ -156,3 +156,11 @@ test('a chat model that calls pay by name gets unknown_tool and nothing is paid'
   const r = await createChat({ desk, model }).respond([], 'pay it');
   assert.equal(r.toolCalls[0].result.error.code, 'unknown_tool');
 });
+
+test('the pay widget states the hold time in Riyadh time, in both languages, from hold_until', () => {
+  const { desk } = clockDesk(); // 08:00 Riyadh
+  const { out } = bookFirst(desk);
+  const [w] = widgetsFor({ toolCalls: [{ name: 'book', result: out }], state: newWidgetState(), booked: out.booking }).ui;
+  assert.equal(w.held_en, `Held until 08:30 ${DATA.availability.time_name_en}`);
+  assert.equal(w.held_ar, `محجوز حتى 08:30 ${DATA.availability.time_name_ar}`);
+});

@@ -117,6 +117,8 @@ textarea::placeholder { color: var(--muted); opacity: 1; }
 /* Widgets under the desk's message: built by the server from tool results, never from the model's words */
 .widgets { align-self: flex-start; width: min(100%, 34rem); display: grid; gap: 10px; }
 .widgets[inert] .go, .widgets[inert] .more { display: none; }
+.widgets[inert] form.picker { display: none; } /* an answer in the composer moved on: no empty fields left behind */
+.sent { margin: 0; color: var(--muted, inherit); font-size: 14px; }
 .card { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
 .card h3 { margin: 0 0 8px; font-size: 14px; font-weight: 500; color: var(--muted); }
 .card .row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding-block: 3px; }
@@ -268,13 +270,13 @@ const W = {
     level: 'خبرتك', services: 'الخدمات التي تريدها', sendDetails: 'أرسل التفاصيل', needDetails: 'اختر مستواك وخدمة واحدة على الأقل.',
     detailsMsg: (tier, s) => `مستواي: ${tier}. الخدمات: ${s.join('، ')}.`,
     contactTitle: 'بياناتك للحجز', name: 'الاسم', contact: 'البريد الإلكتروني أو رقم الجوال', sendContact: 'أرسل بياناتي',
-    needContact: 'اكتب اسمك، ثم بريدًا إلكترونيًا أو رقم جوال صحيحًا.', contactMsg: (n, c) => `اسمي ${n}، وللتواصل: ${c}` },
+    needContact: 'اكتب اسمك، ثم بريدًا إلكترونيًا أو رقم جوال صحيحًا.', contactMsg: (n, c) => `اسمي ${n}، وللتواصل: ${c}`, sentAs: (n, c) => `أُرسل: ${n} · ${c}` },
   en: { quote: 'Quote from the price list', tier: 'Level', discount: 'Bundle discount', total: 'Total', cur: 'SAR',
     times: 'Pick a time for the kickoff call', more: (n) => `Show ${n} more times`, slotMsg: (l) => `I'll take ${l}`,
     level: 'Your experience', services: 'Services you want', sendDetails: 'Send details', needDetails: 'Pick your level and at least one service.',
     detailsMsg: (tier, s) => `My level: ${tier}. Services: ${s.join(', ')}.`,
     contactTitle: 'Your details for the booking', name: 'Name', contact: 'Email or mobile number', sendContact: 'Send my details',
-    needContact: 'Enter your name, then a valid email or mobile number.', contactMsg: (n, c) => `My name is ${n}, contact: ${c}` },
+    needContact: 'Enter your name, then a valid email or mobile number.', contactMsg: (n, c) => `My name is ${n}, contact: ${c}`, sentAs: (n, c) => `Sent: ${n} · ${c}` },
 };
 let uid = 0;
 const nextId = () => `w${++uid}`;
@@ -354,7 +356,7 @@ function contactForm(lang) {
     e.preventDefault(); const n = name.value.trim(); const c = contact.value.trim();
     const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c) || /^\+?[\d\s-]{7,}$/.test(c);
     if (!n || !ok) { err.textContent = s.needContact; (n ? contact : name).focus(); return; }
-    err.textContent = ''; send(s.contactMsg(n, c));
+    err.textContent = ''; f.replaceWith(el('p', 'sent', s.sentAs(n, c))); send(s.contactMsg(n, c)); // a used form becomes one line
   });
   return f;
 }
@@ -368,7 +370,9 @@ const PAY_TEXT = {
 };
 function payCard(w, lang) {
   const s = PAY_TEXT[lang]; const c = titled('section', s.title); c.classList.add('pay');
-  c.append(row(s.ref, w.reference), row(s.amount, cash(w.amount, lang), 'total'), el('p', 'tier', w[`note_${lang}`] ?? w.note_en));
+  c.append(row(s.ref, w.reference), row(s.amount, cash(w.amount, lang), 'total'));
+  if (w[`held_${lang}`]) c.append(el('p', 'tier', w[`held_${lang}`]));
+  c.append(el('p', 'tier', w[`note_${lang}`] ?? w.note_en));
   const err = el('p', 'err'); err.setAttribute('role', 'alert');
   const go = el('button', 'btn go', w[`button_${lang}`] ?? w.button_en); go.type = 'button';
   go.addEventListener('click', async () => {
@@ -437,7 +441,11 @@ $('reset').addEventListener('click', () => { state.sessionId = null; state.turns
 const params = new URLSearchParams(location.search);
 if (params.get('lang') === 'en') state.lang = 'en';
 if (params.get('theme') === 'dark' || params.get('theme') === 'light') document.documentElement.dataset.theme = params.get('theme');
-$('act').open = matchMedia('(min-width: 900px)').matches;
+// The activity panel is open on wide screens and folded on phones, and follows the width when it changes
+// (it once stayed folded after a phone-width load was widened, which looked like an empty panel).
+const wide = matchMedia('(min-width: 900px)');
+$('act').open = wide.matches;
+wide.addEventListener('change', (e) => { $('act').open = e.matches; });
 applyLang();
 </script>
 </body>

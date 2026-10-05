@@ -8,6 +8,9 @@ import { toWestern } from './guard.mjs';
 const DATA = JSON.parse(readFileSync(new URL('../data/demo-business.json', import.meta.url), 'utf8'));
 const SERVICES = DATA.services.map(({ id, name_en, name_ar }) => ({ id, name_en, name_ar }));
 const PAY = DATA.payment;
+const AV = DATA.availability;
+/** HH:MM of an instant in the business timezone. */
+const clock = (iso) => new Intl.DateTimeFormat('en-GB', { timeZone: AV.timezone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(iso));
 const TIERS = DATA.tiers.map(({ id, name_en, name_ar }) => ({ id, name_en, name_ar }));
 
 /** What a session has already been shown: a quote, free slots. */
@@ -47,7 +50,8 @@ export function widgetsFor({ toolCalls = [], state = newWidgetState(), booked, h
   if (unpaid?.status === 'awaiting_payment' && !handover) {
     return { ui: [{ type: 'pay', reference: unpaid.reference, amount: unpaid.amount_due, currency: unpaid.currency,
       slot: unpaid.slot, hold_until: unpaid.hold_until, button_en: PAY.pay_button_en, button_ar: PAY.pay_button_ar,
-      note_en: PAY.note_en, note_ar: PAY.note_ar }], state: { ...next, awaitingPayment: unpaid.reference, done: true } };
+      note_en: PAY.note_en, note_ar: PAY.note_ar,
+      held_en: `Held until ${clock(unpaid.hold_until)} ${AV.time_name_en}`, held_ar: `محجوز حتى ${clock(unpaid.hold_until)} ${AV.time_name_ar}` }], state: { ...next, awaitingPayment: unpaid.reference, done: true } };
   }
   if (booked || handover || toolCalls.some((c) => c.result?.handover || (c.name === 'book' && c.result?.ok))) {
     return { ui: [], state: { ...next, done: true } };

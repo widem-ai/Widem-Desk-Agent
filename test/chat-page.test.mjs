@@ -70,3 +70,21 @@ test('the page renders the pay step: amount card and the demo button from the wi
   assert.match(body, /disabled = true/, 'the button disables after use');
   for (const status of ['409', '400']) assert.ok(body.includes(status), `handles ${status}`);
 });
+
+test('used forms do not stay as empty fields: a sent contact form becomes a one-line summary, an unused one is hidden', () => {
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  assert.match(html, /\.widgets\[inert\] form\.picker \{ display: none; \}/);
+  const body = html.slice(html.indexOf('function contactForm'), html.indexOf('function renderUi'));
+  assert.match(body, /f\.replaceWith\(el\('p', 'sent', s\.sentAs\(n, c\)\)\)/);
+  assert.match(html, /sentAs: \(n, c\) => `Sent: \$\{n\} · \$\{c\}`/);
+  assert.match(html, /sentAs: \(n, c\) => `أُرسل: \$\{n\} · \$\{c\}`/);
+  assert.match(html, /w\[`held_\$\{lang\}`\]/, 'the pay card shows the hold time from the widget');
+});
+
+// Found 2026-10-05: the activity panel looked empty after the page was opened at phone width and then widened. It is
+// a <details> opened once at load for wide screens; it stayed closed on a later resize. It must follow the width.
+test('the activity panel opens and closes with the width, not only at load', () => {
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  assert.match(html, /const wide = matchMedia\('\(min-width: 900px\)'\);/);
+  assert.match(html, /wide\.addEventListener\('change', \(e\) => \{ \$\('act'\)\.open = e\.matches; \}\);/);
+});
