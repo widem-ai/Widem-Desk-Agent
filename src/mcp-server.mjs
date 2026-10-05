@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { createDesk } from './desk.mjs';
 import { TOOLS, toZodShape } from './tools.mjs';
 import { createChat, createNebiusModel, sorryReply } from './chat.mjs';
+import { widgetsFor, trimSlotLines, pickSlotLine, newWidgetState } from './widgets.mjs';
 import { createFileStore, createMemoryStore } from './store.mjs';
 
 const MAX_BODY_BYTES = 64 * 1024;
@@ -117,6 +118,7 @@ function trimHistory(history, max) {
 function createChatRoute(desk, model, limits, now) {
   const chat = model ? createChat({ desk, model }) : null;
   const sessions = new Map();
+  const uiStates = new Map(); // per session: what the widgets have shown so far (a quote, free slots)
   const perIp = createBuckets(limits.perIp.messages, limits.perIp.windowMs, now);
   const global = createBuckets(limits.global.messages, limits.global.windowMs, now);
   const newSessions = createBuckets(limits.newSessionsPerIp.count, limits.newSessionsPerIp.windowMs, now);
@@ -157,11 +159,16 @@ function createChatRoute(desk, model, limits, now) {
     if (out.latin?.length) console.warn(`chat reply: Latin words in an Arabic reply: ${out.latin.join(', ')}`);
     sessions.delete(id);
     sessions.set(id, trimHistory(out.history, limits.maxHistoryMessages));
-    if (sessions.size > limits.maxSessions) sessions.delete(sessions.keys().next().value);
+    if (sessions.size > limits.maxSessions) { const gone = sessions.keys().next().value; sessions.delete(gone); uiStates.delete(gone); }
     const booked = out.booked ?? out.toolCalls.findLast((c) => c.name === 'book' && c.result?.ok)?.result.booking;
     const handover = out.handover ?? out.toolCalls.findLast((c) => c.result?.handover)?.result.handover;
-    send(res, 200, { sessionId: id, reply: out.reply.replace(/^(\s*\n)+/, ''),
-      ...(booked ? { booked } : {}), ...(handover ? { handover } : {}), activity: activityOf(out.toolCalls) });
+    // Widgets come from this turn's tool results and the session's widget state, never from the model's text.
+    const { ui, state } = widgetsFor({ toolCalls: out.toolCalls, state: uiStates.get(id) ?? newWidgetState(), booked, handover });
+    if (sessions.has(id)) uiStates.set(id, state);
+    let reply = out.reply.replace(/^(\s*\n)+/, '');
+    if (ui.some((w) => w.type === 'slots')) reply = trimSlotLines(reply) || pickSlotLine(/[؀-ۿ]/.test(message));
+    send(res, 200, { sessionId: id, reply,
+      ...(booked ? { booked } : {}), ...(handover ? { handover } : {}), activity: activityOf(out.toolCalls), ui });
   };
 }
 
