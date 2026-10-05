@@ -41,8 +41,9 @@ const slotChips = (r) => ({
 
 /** The widgets for one turn. toolCalls: [{ name, result }] from this turn; state: what the session has seen.
  * Returns { ui, state } with the state updated. After a booking or a handover the chat needs no widget. */
-export function widgetsFor({ toolCalls = [], state = newWidgetState(), booked, handover } = {}) {
+export function widgetsFor({ toolCalls = [], state = newWidgetState(), booked, handover, picked } = {}) {
   const next = { ...state };
+  if (picked) next.slotPicked = true; // the customer's message picked an offered slot; new slots below reset it
   const ui = [];
   if (state.done) return { ui, state: next };
   // A clear no (ask_choice "declined"): nothing under the reply that turn, no picker, no slots, no contact form, and
@@ -66,7 +67,7 @@ export function widgetsFor({ toolCalls = [], state = newWidgetState(), booked, h
     }
     if (c.name === 'check_availability' && c.result.slots?.length) {
       const old = ui.findIndex((w) => w.type === 'slots'); if (old >= 0) ui.splice(old, 1);
-      ui.push(slotChips(c.result)); next.slotsOffered = true;
+      ui.push(slotChips(c.result)); next.slotsOffered = true; next.slotPicked = false;
     }
   }
   // A booking awaiting payment gets the demo pay button (built from the booking: amount, reference; no card fields).
@@ -82,7 +83,7 @@ export function widgetsFor({ toolCalls = [], state = newWidgetState(), booked, h
   }
   ui.sort((a, b) => (a.type === 'quote' ? -1 : b.type === 'quote' ? 1 : 0));
   if (!ui.length && !next.quoted) ui.push({ type: 'details', services: SERVICES, tiers: TIERS });
-  else if (!ui.length && next.slotsOffered) ui.push({ type: 'contact' });
+  else if (!ui.length && next.slotsOffered && next.slotPicked) ui.push({ type: 'contact' }); // only after a pick
   return { ui, state: next };
 }
 

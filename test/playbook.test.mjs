@@ -45,7 +45,7 @@ function session() {
     const out = await createChat({ desk, model }).respond(history, text);
     history = out.history;
     const handover = out.handover ?? out.toolCalls.findLast((c) => c.result?.handover)?.result.handover;
-    const w = widgetsFor({ toolCalls: out.toolCalls, state, booked: out.booked, handover });
+    const w = widgetsFor({ toolCalls: out.toolCalls, state, booked: out.booked, handover, picked: out.picked });
     state = w.state;
     return { ...out, handover, ui: w.ui, model, tools: out.toolCalls.map((c) => c.name) };
   } };

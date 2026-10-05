@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { toolsFor, checkArgs, toJsonSchema } from './tools.mjs';
 
 const TOOLS = toolsFor('human'); // never the agent-only pay tool: people pay with the button
-import { toWestern, ungrounded, paymentClaims } from './guard.mjs';
+import { toWestern, ungrounded, paymentClaims, statedAmounts } from './guard.mjs';
 import { slotLabels } from './labels.mjs';
 import { latinWords, arabicWords } from './latin.mjs';
 
@@ -139,12 +139,54 @@ export function asksForContactBeforePick(reply, messages) {
   const lastOffer = messages.findLastIndex((m) => m.tool_calls?.some((c) => c.function?.name === 'check_availability'));
   if (lastOffer <= lastCustomer) return false;
   // A customer who already named one of the offered times ("Tuesday 10:00 please") has picked.
-  const ids = new Set(messages[lastOffer].tool_calls.map((c) => c.id));
+  return !namesOfferedTime(messages, lastOffer, lastCustomer);
+}
+
+/** True when the customer message at customerIndex names a start time of the slots offered at offerIndex. */
+function namesOfferedTime(messages, offerIndex, customerIndex) {
+  const ids = new Set(messages[offerIndex].tool_calls.map((c) => c.id));
   const slots = messages.filter((m) => m.role === 'tool' && ids.has(m.tool_call_id))
     .flatMap((m) => { try { return JSON.parse(m.content).slots ?? []; } catch { return []; } });
-  const said = toWestern(String(messages[lastCustomer]?.content ?? ''));
-  return !slots.some((s) => [s.start.slice(11, 16), s.start.slice(11, 16).replace(/^0/, '')]
+  const said = toWestern(String(messages[customerIndex]?.content ?? ''));
+  return slots.some((s) => [s.start.slice(11, 16), s.start.slice(11, 16).replace(/^0/, '')]
     .some((t) => new RegExp(`(?<![\\d:])${t}(?![\\d])`).test(said)));
+}
+
+/** True when the customer's latest message picks one of the slots offered before it (the page's chip message,
+ * or a typed time). The contact form waits for this (live run 2026-10-05: it showed under a loop reply). */
+export function pickedOfferedSlot(messages) {
+  const lastCustomer = messages.findLastIndex((m) => m.role === 'user' && !HIDDEN.has(m));
+  const lastOffer = messages.findLastIndex((m, i) => i < lastCustomer && m.tool_calls?.some((c) => c.function?.name === 'check_availability'));
+  return lastOffer >= 0 && namesOfferedTime(messages, lastOffer, lastCustomer);
+}
+
+/** The latest successful result of a tool in this conversation, or undefined. */
+function latestResult(messages, name) {
+  const ids = new Set(messages.flatMap((m) => (m.tool_calls ?? []).filter((c) => c.function?.name === name).map((c) => c.id)));
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    if (messages[i].role !== 'tool' || !ids.has(messages[i].tool_call_id)) continue;
+    try { const r = JSON.parse(messages[i].content); if (r.ok) return r; } catch { /* not JSON */ }
+  }
+  return undefined;
+}
+
+/** SAR amounts a reply states that are not the latest quote's total or discount, nor the booking's amount. The guard
+ * accepts any amount a tool returned in the session, so an old line price said as a new total passed it
+ * (live run 2026-10-05: 550, the CV line of a 950 quote, with no quote call for the CV alone). */
+export function staleTotals(reply, messages) {
+  const q = latestResult(messages, 'quote');
+  const b = latestResult(messages, 'book')?.booking;
+  const allowed = new Set([q?.total, q?.discount, b?.amount_due, b?.price_quoted].filter(Number.isFinite));
+  return statedAmounts(reply).filter((n) => !allowed.has(n));
+}
+
+/** The reply after book, built in code: the slot is held until payment and the pay button is below. The model's own
+ * line said "تم حجز" (booked) before payment in the live run, which prompt rule 7 forbids. */
+export function heldLine(booking, arabic) {
+  const { label_en, label_ar } = slotLabels(booking.slot.start, booking.slot.end, AV);
+  return arabic
+    ? `الموعد ${label_ar} محجوز لك مؤقتًا حتى الدفع. المبلغ ${booking.amount_due} ريال، والمرجع ${booking.reference}. ادفع بالزر أدناه لتأكيد المكالمة.`
+    : `Your time, ${label_en}, is held for you until payment. The amount is ${booking.amount_due} SAR, reference ${booking.reference}. Pay with the button below to confirm the call.`;
 }
 
 // A line that teases more slots ("and more", an ellipsis) instead of listing them.
@@ -207,6 +249,8 @@ export function createChat({ desk, model, maxRounds = 6 }) {
       let corrected = false;
       let nudged = false; // the slots-first note goes to the model at most once per turn
       let pickNudged = false; // so does the pick-first note
+      let priceNudged = false; // and the stale-total note
+      const picked = pickedOfferedSlot(messages);
       const visible = () => messages.slice(1).filter((m) => !HIDDEN.has(m));
       // Bookings made in this turn get the conversation up to the reply the customer is about to see.
       const finish = (result) => {
@@ -216,7 +260,7 @@ export function createChat({ desk, model, maxRounds = 6 }) {
           booked = desk.updateTranscript(c.result.booking.reference, transcriptOf(messages), HUMAN).booking ?? booked;
         }
         // A measure, not a block: Latin words in an Arabic reply, for the server to log.
-        const out = { ...result, latin: latinWords(result.reply) };
+        const out = { ...result, latin: latinWords(result.reply), picked };
         return booked ? { ...out, booked } : out;
       };
       // Stop and pass the customer to a person, with the conversation the customer actually saw.
@@ -265,13 +309,26 @@ export function createChat({ desk, model, maxRounds = 6 }) {
             messages.push(nudge);
             continue;
           }
+          const stale = invented.length ? [] : staleTotals(message.content, messages);
+          if (stale.length && !priceNudged) {
+            // A total that is not the latest quote's (live run 2026-10-05): held back once, like the slots-first hold.
+            priceNudged = true;
+            HIDDEN.add(message);
+            const nudge = { role: 'user', content: `Desk check, not from the customer: your reply states ${stale.join(', ')} SAR, which is `
+              + 'not the total of the latest quote. If the customer changed the services, call quote for them and state the total it returns.' };
+            HIDDEN.add(nudge);
+            messages.push(nudge);
+            continue;
+          }
           if (!invented.length) {
             // Deterministic post-steps on a reply the guard passed: no teaser lines, and a confirmation that
             // states the slot and price from the book result. Both add only values a tool returned.
             let reply = message.content ?? '';
             if (toolCalls.some((c) => c.name === 'check_availability')) reply = dropTeasers(reply);
             const booking = toolCalls.findLast((c) => c.name === 'book' && c.result?.ok)?.result.booking;
-            if (booking) reply = withConfirmation(reply, booking, ARABIC.test(text));
+            if (booking) {
+              reply = booking.status === 'awaiting_payment' ? heldLine(booking, ARABIC.test(text)) : withConfirmation(reply, booking, ARABIC.test(text));
+            }
             // A reply held back for slots first may have carried the quoted total; the customer still gets it.
             const quoted = (nudged || pickNudged) && toolCalls.findLast((c) => c.name === 'quote' && c.result?.ok)?.result;
             if (quoted) reply = withQuotedTotal(reply, quoted.total, ARABIC.test(text));

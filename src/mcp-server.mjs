@@ -192,7 +192,7 @@ function createChatRoute(desk, model, limits, now) {
     const booked = out.booked ?? out.toolCalls.findLast((c) => c.name === 'book' && c.result?.ok)?.result.booking;
     const handover = out.handover ?? out.toolCalls.findLast((c) => c.result?.handover)?.result.handover;
     // Widgets come from this turn's tool results and the session's widget state, never from the model's text.
-    const { ui, state } = widgetsFor({ toolCalls: out.toolCalls, state: uiStates.get(id) ?? newWidgetState(), booked, handover });
+    const { ui, state } = widgetsFor({ toolCalls: out.toolCalls, state: uiStates.get(id) ?? newWidgetState(), booked, handover, picked: out.picked });
     if (sessions.has(id)) uiStates.set(id, state);
     let reply = out.reply.replace(/^(\s*\n)+/, '');
     if (ui.some((w) => w.type === 'slots')) reply = trimSlotLines(reply) || pickSlotLine(/[؀-ۿ]/.test(message));

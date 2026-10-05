@@ -64,7 +64,9 @@ test('a confirmation without slot or price gets them added from the book result,
   const { desk, store } = fresh();
   const model = scriptedModel([toolCall('b', 'book', { ...ORDER, slot: SLOT, ...CUSTOMER }), say('تم الحجز. رقم الحجز BK-0001.')]);
   const out = await createChat({ desk, model }).respond([], 'احجز لي الثلاثاء الساعة 10');
-  assert.ok(out.reply.startsWith('تم الحجز. رقم الحجز BK-0001.'));
+  // Since 2026-10-05 the post-book reply is built in code (held until payment), never the model's "booked" line.
+  assert.doesNotMatch(out.reply, /تم الحجز/);
+  assert.match(out.reply, /BK-0001/);
   assert.match(out.reply, /الثلاثاء/);
   assert.match(out.reply, /10:00 إلى 11:00/);
   assert.match(out.reply, /1575 ريال/);
@@ -77,7 +79,11 @@ test('a confirmation that already states slot and price passes byte-identical', 
   const { desk } = fresh();
   const text = 'Booked: BK-0001, Tuesday 6 October 10:00 to 11:00 Riyadh time, 1575 SAR.';
   const model = scriptedModel([toolCall('b', 'book', { ...ORDER, slot: SLOT, ...CUSTOMER }), say(text)]);
-  assert.equal((await createChat({ desk, model }).respond([], 'Book Tuesday 10:00')).reply, text);
+  // Since 2026-10-05 the post-book reply is built in code (held until payment), never the model's "booked" line.
+  const reply = (await createChat({ desk, model }).respond([], 'Book Tuesday 10:00')).reply;
+  assert.doesNotMatch(reply, /\bbooked\b/i);
+  assert.match(reply, /held for you until payment/);
+  assert.ok(reply.includes('BK-0001') && reply.includes('1575 SAR') && reply.includes('10:00 to 11:00'));
 });
 
 test('teaser lines ("and more", an ellipsis) are dropped from a slot list; the slots stay', async () => {
@@ -98,8 +104,13 @@ test('a confirmation that states the slot but not the price gets only the price,
   const text = 'تم الحجز. رقم الحجز BK-0001. موعد المكالمة: الثلاثاء، 6 أكتوبر، 10:00 إلى 11:00 بتوقيت الرياض.';
   const model = scriptedModel([toolCall('b', 'book', { ...ORDER, slot: SLOT, ...CUSTOMER }), say(text)]);
   const out = await createChat({ desk, model }).respond([], 'احجز لي الثلاثاء الساعة 10');
-  assert.equal(out.reply, `${text}\n\nالسعر: 1575 ريال.`);
+  // Since 2026-10-05 the post-book reply is built in code (held until payment), never the model's "booked" line.
+  assert.doesNotMatch(out.reply, /تم الحجز/);
+  assert.match(out.reply, /10:00 إلى 11:00/);
+  assert.equal(out.reply.match(/1575 ريال/g).length, 1, 'the amount once');
   const priced = scriptedModel([toolCall('b', 'book', { ...ORDER, slot: SLOT, ...CUSTOMER }), say('Booked BK-0001 for 1575 SAR.')]);
   const out2 = await createChat({ desk: fresh().desk, model: priced }).respond([], 'Book Tuesday 10:00');
-  assert.equal(out2.reply, 'Booked BK-0001 for 1575 SAR.\n\nYour call: Tuesday 6 October, 10:00 to 11:00 Riyadh time.');
+  assert.doesNotMatch(out2.reply, /\bbooked\b/i);
+  assert.equal(out2.reply.match(/1575 SAR/g).length, 1, 'the amount once');
+  assert.match(out2.reply, /Tuesday 6 October, 10:00 to 11:00 Riyadh time/);
 });

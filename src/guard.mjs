@@ -66,6 +66,12 @@ export function ungrounded(reply, toolResults) {
   return found;
 }
 
+/** The SAR amounts a reply states, as numbers, in order of the patterns. */
+export function statedAmounts(reply) {
+  const text = toWestern(String(reply ?? ''));
+  return [AMOUNT_AFTER, AMOUNT_BEFORE].flatMap((re) => [...text.matchAll(re)].map((m) => Number(m[1])));
+}
+
 // Darb takes payment at booking (2026-10-05), so the desk never says the call is free or that nothing is due now.
 // Free *times* are fine ("pick a free time"); a free call, booking for free or paying later are not.
 const PAYMENT_CLAIMS = [

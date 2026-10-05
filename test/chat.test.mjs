@@ -58,7 +58,8 @@ test('an Arabic booking through the chat equals the agent door booking, apart fr
   const chat = createChat({ desk, model });
   const out = await chat.respond([], 'أريد الباقة الكاملة، عندي خبرة ١٢ سنة، واحجز لي الثلاثاء الساعة ١٠');
 
-  assert.equal(out.reply, 'تم الحجز. رقم الحجز BK-0001، الثلاثاء 10:00 إلى 11:00، السعر 1575 ريال.');
+  // Since 2026-10-05 the post-book reply is built in code (held until payment), never the model's "booked" line.
+  assert.match(out.reply, /^الموعد .+ محجوز لك مؤقتًا حتى الدفع\. المبلغ 1575 ريال، والمرجع BK-0001\. ادفع بالزر أدناه/);
   assert.equal(out.modelId, 'fake/scripted');
   assert.deepEqual(out.toolCalls.map((c) => c.name), ['quote', 'book']);
 
@@ -69,7 +70,7 @@ test('an Arabic booking through the chat equals the agent door booking, apart fr
   assert.equal(JSON.parse(toolMessages[0].content).total, PROFILES[1].total);
   // The stored transcript is brought up to the end of the turn afterwards; everything else is what the model saw.
   assert.deepEqual({ ...JSON.parse(toolMessages[1].content).booking, transcript: 'x' }, { ...store.all('bookings')[0], transcript: 'x' });
-  assert.match(store.all('bookings')[0].transcript, /Desk: تم الحجز/);
+  assert.match(store.all('bookings')[0].transcript, /Desk: الموعد .+ محجوز لك مؤقتًا/);
 
   const human = store.all('bookings');
   assert.equal(human.length, 1);

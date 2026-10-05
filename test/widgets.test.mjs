@@ -45,7 +45,9 @@ test('a quote becomes a price card with the engine figures; free slots become ch
 
 test('after slots were offered and the customer picked one: a contact form; after booking or handover: nothing', () => {
   const state = { ...newWidgetState(), quoted: true, slotsOffered: true };
-  assert.deepEqual(types(widgetsFor({ toolCalls: [], state }).ui), ['contact']);
+  // Since 2026-10-05 the form waits for a picked slot (it showed under a loop reply in the live run).
+  assert.deepEqual(types(widgetsFor({ toolCalls: [], state }).ui), [], 'no pick yet: no form');
+  assert.deepEqual(types(widgetsFor({ toolCalls: [], state, picked: true }).ui), ['contact']);
   assert.deepEqual(widgetsFor({ toolCalls: [], state, booked: { reference: 'BK-0001' } }).ui, []);
   assert.deepEqual(widgetsFor({ toolCalls: [], state: newWidgetState(), handover: { id: 'HO-0001' } }).ui, []);
 });

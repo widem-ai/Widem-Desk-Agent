@@ -71,7 +71,8 @@ test('the server issues the session id; a booking keeps the facts and the whole 
     const second = await say('Sara, sara@example.com');
     assert.equal(second.status, 200);
     assert.equal(second.json.sessionId, first.json.sessionId);
-    assert.equal(second.json.reply, 'Booked: BK-0001, Tuesday 10:00 to 11:00, 1575 SAR.');
+    // Since 2026-10-05 the post-book reply is built in code (held until payment), never the model's "booked" line.
+    assert.match(second.json.reply, /held for you until payment\. The amount is 1575 SAR, reference BK-0001\./);
     const [stored] = store.all('bookings');
     assert.deepEqual(second.json.booked, stored);
     assert.equal(stored.door, 'human');
@@ -80,7 +81,7 @@ test('the server issues the session id; a booking keeps the facts and the whole 
     assert.equal(stored.is_executive, false);
     assert.ok(model.seen[1].some((m) => m.role === 'user' && /Full career pack/.test(m.content)));
     // The stored conversation runs to the end of the turn, so the owner sees the confirmation too.
-    assert.match(stored.transcript, /Full career pack[\s\S]*What is your name[\s\S]*sara@example.com[\s\S]*Desk: Booked: BK-0001, Tuesday 10:00 to 11:00, 1575 SAR\.$/);
+    assert.match(stored.transcript, /Full career pack[\s\S]*What is your name[\s\S]*sara@example.com[\s\S]*Desk: Your time, .+ is held for you until payment\. The amount is 1575 SAR, reference BK-0001\. Pay with the button below to confirm the call\.$/);
   });
 });
 
