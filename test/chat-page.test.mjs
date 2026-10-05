@@ -66,7 +66,7 @@ test('the page renders the pay step: amount card and the demo button from the wi
   assert.match(body, /fetch\('\/chat\/pay'/);
   assert.match(body, /sessionId: state\.sessionId/);
   assert.match(body, /button_\$\{lang\}/, 'the button label comes from the data file via the widget');
-  assert.ok(!/el('(?:input|select|textarea)'|card ?number|iban|cvv/i.test(body), 'no card or bank fields are created');
+  assert.ok(!/el\('(?:input|select|textarea)'|card ?number|iban|cvv/i.test(body), 'no card or bank fields are created');
   assert.match(body, /disabled = true/, 'the button disables after use');
   for (const status of ['409', '400']) assert.ok(body.includes(status), `handles ${status}`);
 });
