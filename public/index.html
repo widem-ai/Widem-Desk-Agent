@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Darb front desk</title>
+<meta name="description" content="Prototype chat with the Widem agent desk for Darb, a fictional career studio. Demo only.">
+<meta name="color-scheme" content="light dark">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #eef1f0; --surface: #fbfcfb; --ink: #13212e; --muted: #4c5a64; --line: #d3dad8;
+  --accent: #0f6e5a; --on-accent: #f6fbf9; --accent-soft: #dcebe5; --you: #13212e; --on-you: #f2f5f4;
+  --warn: #8a3b12; --warn-soft: #f6e6dc;
+  --radius: 14px; --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1920; --surface: #15232c; --ink: #e4ebe9; --muted: #9caeb5; --line: #2a3a44;
+    --accent: #5fc3a4; --on-accent: #0b1a15; --accent-soft: #183a31; --you: #dfe7e4; --on-you: #10202a;
+    --warn: #f0a37c; --warn-soft: #3a2419; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1920; --surface: #15232c; --ink: #e4ebe9; --muted: #9caeb5; --line: #2a3a44;
+  --accent: #5fc3a4; --on-accent: #0b1a15; --accent-soft: #183a31; --you: #dfe7e4; --on-you: #10202a;
+  --warn: #f0a37c; --warn-soft: #3a2419; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 400 16px/1.6 "IBM Plex Sans Arabic", system-ui, "Segoe UI", Tahoma, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.app { min-height: 100dvh; display: grid; grid-template-rows: auto auto 1fr; max-width: 1180px; margin-inline: auto; padding-inline: 16px; }
+.demo {
+  margin-block-start: 12px; padding: 8px 14px; border-radius: 10px;
+  background: var(--warn-soft); color: var(--warn); font-size: 14px; font-weight: 500;
+}
+header { display: flex; align-items: center; gap: 12px; padding-block: 18px 14px; }
+.brand { display: flex; align-items: baseline; gap: 10px; margin-inline-end: auto; }
+.brand b { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1; }
+.brand span { color: var(--muted); font-size: 14px; }
+.btn {
+  min-height: 44px; padding-inline: 16px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--surface); cursor: pointer; font-size: 14px; font-weight: 500;
+  transition: transform 140ms var(--ease-out), background-color 140ms ease;
+}
+.btn:active { transform: scale(0.97); }
+@media (hover: hover) and (pointer: fine) { .btn:hover { background: var(--accent-soft); } }
+
+.desk { display: grid; gap: 16px; padding-block-end: 16px; min-height: 0; }
+@media (min-width: 900px) {
+  .desk { grid-template-columns: minmax(0, 1fr) 320px; height: calc(100dvh - 140px); }
+}
+
+/* Chat */
+.chat { display: grid; grid-template-rows: 1fr auto; min-height: 60dvh; background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.log { overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; overscroll-behavior: contain; }
+.msg { max-width: min(78%, 34rem); padding: 10px 14px; border-radius: 16px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg.desk-msg { align-self: flex-start; background: var(--accent-soft); border-start-start-radius: 4px; }
+.msg.you { align-self: flex-end; background: var(--you); color: var(--on-you); border-start-end-radius: 4px; }
+.msg.note { align-self: center; max-width: 100%; background: none; color: var(--muted); font-size: 14px; text-align: center; }
+@media (prefers-reduced-motion: no-preference) {
+  .msg, .act li { animation: enter 220ms var(--ease-out) both; }
+}
+@keyframes enter { from { opacity: 0; transform: translateY(6px); } }
+.typing { align-self: flex-start; color: var(--muted); font-size: 14px; padding-inline: 4px; }
+.typing::after { content: "..."; display: inline-block; width: 1.2em; text-align: start; }
+@media (prefers-reduced-motion: no-preference) {
+  .typing::after { animation: dots 1s steps(4, end) infinite; overflow: hidden; vertical-align: bottom; }
+}
+@keyframes dots { from { width: 0; } to { width: 1.2em; } }
+
+.empty { margin: auto; text-align: center; max-width: 30rem; padding: 24px 8px; }
+.empty h1 { font-size: clamp(28px, 4vw, 40px); font-weight: 600; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+.empty p { color: var(--muted); margin: 0 0 20px; }
+.starters { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+
+form { display: flex; gap: 8px; padding: 12px; border-block-start: 1px solid var(--line); background: var(--surface); }
+textarea {
+  flex: 1; resize: none; min-height: 48px; max-height: 160px; padding: 11px 14px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--bg); line-height: 1.5;
+}
+textarea::placeholder { color: var(--muted); opacity: 1; }
+.send { background: var(--accent); color: var(--on-accent); border-color: transparent; min-width: 88px; }
+@media (hover: hover) and (pointer: fine) { .send:hover { background: var(--accent); filter: brightness(1.08); } }
+.send:disabled { opacity: 0.55; cursor: progress; }
+
+/* Desk activity: the receipt of what the desk actually did */
+.act { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 0; min-height: 0; overflow: auto; }
+.act summary { list-style: none; cursor: pointer; padding: 16px 18px 6px; font-weight: 600; min-height: 44px; }
+.act summary::-webkit-details-marker { display: none; }
+.act .hint { margin: 0; padding: 0 18px 12px; color: var(--muted); font-size: 14px; }
+.act ol { list-style: none; margin: 0; padding: 0 18px 18px; display: grid; gap: 10px; }
+.act li { border-block-start: 1px dashed var(--line); padding-block-start: 10px; font-size: 14px; }
+.act .tool { color: var(--muted); }
+.act .fact { font-weight: 500; }
+.act .ref {
+  display: block; margin-block: 6px 2px; font-size: 34px; font-weight: 600; line-height: 1.1;
+  font-variant-numeric: tabular-nums; letter-spacing: 0.02em; color: var(--accent); direction: ltr; text-align: start;
+}
+.act .bad { color: var(--warn); }
+.num { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div class="app">
+  <p class="demo" id="demo"></p>
+  <header>
+    <div class="brand"><b id="brand"></b><span id="sub"></span></div>
+    <button class="btn" id="lang" type="button"></button>
+    <button class="btn" id="reset" type="button"></button>
+  </header>
+  <main class="desk">
+    <section class="chat" aria-labelledby="chat-title">
+      <h2 class="sr" id="chat-title"></h2>
+      <div class="log" id="log" role="log" aria-live="polite"></div>
+      <form id="form">
+        <label class="sr" for="input" id="input-label"></label>
+        <textarea id="input" rows="1" dir="auto" maxlength="2000" autocomplete="off"></textarea>
+        <button class="btn send" id="send" type="submit"></button>
+      </form>
+    </section>
+    <details class="act" id="act">
+      <summary id="act-title"></summary>
+      <p class="hint" id="act-hint"></p>
+      <ol id="act-list"></ol>
+    </details>
+  </main>
+</div>
+<noscript><p style="padding:16px">This chat needs JavaScript. / هذه المحادثة تحتاج إلى JavaScript.</p></noscript>
+<script>
+const STR = {
+  ar: {
+    demo: 'درب شركة وهمية لأغراض العرض فقط. الأسعار والمواعيد هنا للتجربة، ولا يصل أي حجز إلى شخص حقيقي.',
+    brand: 'درب', sub: 'مكتب الاستقبال', lang: 'English', reset: 'محادثة جديدة', chat: 'المحادثة',
+    label: 'رسالتك', placeholder: 'اكتب رسالتك هنا', send: 'إرسال',
+    title: 'كيف نقدر نساعدك في مسارك المهني؟',
+    lead: 'اسأل عن الخدمات والأسعار، أو احجز مكالمة تعارف. المكتب يسعّر من جدول الأسعار مباشرة.',
+    starters: ['أبغى أحجز مراجعة سيرة ذاتية، عندي خبرة ٦ سنوات', 'كم سعر باقة السيرة الذاتية مع لينكدإن؟', 'ممكن خصم؟'],
+    typing: 'المكتب يكتب', act: 'ما يحدث في المكتب', hint: 'كل ما يفعله المكتب خلف الرد يظهر هنا: التسعير، المواعيد، الحجز، والتحويل لموظف.',
+    quote: 'محرك التسعير', avail: 'فحص المواعيد', book: 'حجز', handover: 'تحويل إلى موظف', list: 'قائمة الخدمات',
+    slots: (n) => `${n} موعد متاح`, subtotal: 'قبل الخصم', discount: 'خصم الباقة', total: 'الإجمالي',
+    refused: 'رفض بسبب', sar: 'ريال', turn: (n) => `الرسالة ${n}`,
+    busy: 'المكتب مشغول الآن. انتظر دقيقة ثم أعد الإرسال.', down: 'تعذّر الوصول إلى المكتب. تأكد أن الخادم يعمل ثم أعد الإرسال.',
+    ended: 'انتهت هذه المحادثة. بدأنا محادثة جديدة، أعد إرسال رسالتك.',
+  },
+  en: {
+    demo: 'Darb is a fictional business, for demo only. Prices and times are for testing, and no booking reaches a real person.',
+    brand: 'Darb', sub: 'Front desk', lang: 'العربية', reset: 'New chat', chat: 'Chat',
+    label: 'Your message', placeholder: 'Type your message', send: 'Send',
+    title: 'How can we help with your career?',
+    lead: 'Ask about services and prices, or book a kickoff call. The desk prices straight from the price list.',
+    starters: ['I want to book a CV review, I have 6 years of experience', 'How much is the CV and LinkedIn bundle?', 'Can I get a discount?'],
+    typing: 'The desk is typing', act: 'Desk activity', hint: 'Everything the desk does behind a reply shows here: pricing, free slots, bookings and handovers to a person.',
+    quote: 'Quote engine', avail: 'Free slots checked', book: 'Booked', handover: 'Handed to a person', list: 'Service list',
+    slots: (n) => `${n} free slots`, subtotal: 'Subtotal', discount: 'Bundle discount', total: 'Total',
+    refused: 'Refused:', sar: 'SAR', turn: (n) => `Message ${n}`,
+    busy: 'The desk is busy right now. Wait a minute, then send again.', down: 'Could not reach the desk. Check the server is running, then send again.',
+    ended: 'That chat had ended, so a new one started. Send your message again.',
+  },
+};
+const $ = (id) => document.getElementById(id);
+const state = { lang: 'ar', sessionId: null, turns: 0, busy: false };
+const t = () => STR[state.lang];
+
+function applyLang() {
+  const s = t();
+  document.documentElement.lang = state.lang;
+  document.documentElement.dir = state.lang === 'ar' ? 'rtl' : 'ltr';
+  for (const k of ['demo', 'brand', 'sub', 'lang', 'reset']) $(k).textContent = s[k];
+  $('chat-title').textContent = s.chat; $('input-label').textContent = s.label;
+  $('input').placeholder = s.placeholder; $('send').textContent = s.send;
+  $('act-title').textContent = s.act; $('act-hint').textContent = s.hint;
+  if (!$('log').children.length || $('log').querySelector('.empty')) renderEmpty();
+}
+function renderEmpty() {
+  const s = t(); const log = $('log'); log.replaceChildren();
+  const box = el('div', 'empty');
+  box.append(el('h1', '', s.title), el('p', '', s.lead));
+  const row = el('div', 'starters');
+  for (const text of s.starters) {
+    const b = el('button', 'btn', text); b.type = 'button'; b.dir = 'auto';
+    b.addEventListener('click', () => send(text)); row.append(b);
+  }
+  box.append(row); log.append(box);
+}
+function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+function addMsg(kind, text) {
+  const log = $('log'); log.querySelector('.empty')?.remove();
+  const m = el('div', `msg ${kind}`, text); m.dir = 'auto'; log.append(m);
+  log.scrollTop = log.scrollHeight; return m;
+}
+const money = (n) => `${Number(n).toLocaleString('en-US')} ${t().sar}`;
+function slotLabel(iso) {
+  try { return new Intl.DateTimeFormat(state.lang === 'ar' ? 'ar-SA-u-nu-latn-ca-gregory' : 'en-GB',
+    { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Riyadh' }).format(new Date(iso)); }
+  catch { return iso; }
+}
+function logActivity(json) {
+  const s = t(); const list = $('act-list');
+  const items = [...(json.activity ?? [])];
+  if (json.handover && !items.some((a) => a.handover === json.handover.id)) items.push({ tool: 'handover', ok: true, handover: json.handover.id });
+  for (const a of items) {
+    const li = el('li');
+    li.append(el('span', 'tool', `${s.turn(state.turns)} · ${s[{ quote: 'quote', check_availability: 'avail', book: 'book', handover: 'handover', list_services: 'list' }[a.tool]] ?? a.tool}`));
+    if (!a.ok && !a.handover) li.append(el('div', 'bad', `${s.refused} ${a.code ?? 'error'}`));
+    if (a.tool === 'quote' && a.ok) {
+      if (a.discount) li.append(el('div', 'num', `${s.subtotal}: ${money(a.subtotal)}`), el('div', 'num', `${s.discount}: ${money(a.discount)}`));
+      li.append(el('div', 'fact num', `${s.total}: ${money(a.total)}`));
+    }
+    if (a.tool === 'check_availability' && a.ok) li.append(el('div', 'fact', s.slots(a.slots)));
+    if (a.reference) li.append(el('span', 'ref', a.reference), el('div', 'fact', slotLabel(a.slot)), el('div', 'num', money(a.total)));
+    if (a.handover) li.append(el('span', 'ref', a.handover));
+    list.prepend(li);
+  }
+}
+async function send(text) {
+  text = text.trim(); if (!text || state.busy) return;
+  state.busy = true; $('send').disabled = true; addMsg('you', text); $('input').value = ''; resize();
+  const typing = el('div', 'typing', t().typing); $('log').append(typing); $('log').scrollTop = $('log').scrollHeight;
+  try {
+    const res = await fetch('/chat', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(state.sessionId ? { sessionId: state.sessionId, message: text } : { message: text }) });
+    const json = await res.json().catch(() => ({}));
+    typing.remove();
+    if (json.error?.code === 'unknown_session') { state.sessionId = null; addMsg('note', t().ended); return; }
+    if (json.sessionId) state.sessionId = json.sessionId;
+    if (json.reply) addMsg('desk-msg', json.reply);
+    if (res.status === 429 && !json.reply) addMsg('note', t().busy);
+    if (!res.ok && !json.reply) addMsg('note', t().down);
+    if (res.ok) { state.turns += 1; logActivity(json); }
+  } catch {
+    typing.remove(); addMsg('note', t().down);
+  } finally {
+    state.busy = false; $('send').disabled = false; $('input').focus();
+  }
+}
+function resize() { const i = $('input'); i.style.height = 'auto'; i.style.height = `${Math.min(i.scrollHeight, 160)}px`; }
+
+$('form').addEventListener('submit', (e) => { e.preventDefault(); send($('input').value); });
+$('input').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send($('input').value); } });
+$('input').addEventListener('input', resize);
+$('lang').addEventListener('click', () => { state.lang = state.lang === 'ar' ? 'en' : 'ar'; applyLang(); });
+$('reset').addEventListener('click', () => { state.sessionId = null; state.turns = 0; $('act-list').replaceChildren(); $('log').replaceChildren(); renderEmpty(); $('input').focus(); });
+const params = new URLSearchParams(location.search);
+if (params.get('lang') === 'en') state.lang = 'en';
+if (params.get('theme') === 'dark' || params.get('theme') === 'light') document.documentElement.dataset.theme = params.get('theme');
+$('act').open = matchMedia('(min-width: 900px)').matches;
+applyLang();
+</script>
+</body>
+</html>

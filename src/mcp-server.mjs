@@ -1,6 +1,7 @@
 // The agent door: a remote MCP server (Streamable HTTP, stateless) for customers' AI agents.
 // Each tool calls the core and nothing else, so an agent gets exactly what a person would.
 import http from 'node:http';
+import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -38,6 +39,23 @@ function sendJson(res, status, message) {
   res.writeHead(status, { 'content-type': 'application/json' })
     .end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32700, message }, id: null }));
 }
+
+/** What the desk did in one chat turn, for the chat page's activity panel: tool facts only, never the customer's contact. */
+export function activityOf(toolCalls = []) {
+  return toolCalls.map(({ name, result: r }) => {
+    const a = { tool: name, ok: r?.ok !== false };
+    if (r?.ok === false && r.error) a.code = r.error.code;
+    if (name === 'quote' && r?.ok) Object.assign(a, { services: r.lines.map((l) => l.service), tier: r.tier,
+      subtotal: r.subtotal, discount: r.discount, total: r.total, currency: r.currency });
+    if (name === 'check_availability' && r?.ok) a.slots = r.slots.length;
+    if (name === 'book' && r?.booking) Object.assign(a, { reference: r.booking.reference, slot: r.booking.slot.start,
+      total: r.booking.price_quoted, currency: r.booking.currency });
+    if (r?.handover) a.handover = r.handover.id;
+    return a;
+  });
+}
+
+const PAGE_FILE = new URL('../public/index.html', import.meta.url);
 
 const send = (res, status, value) => res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(value));
 
@@ -143,7 +161,7 @@ function createChatRoute(desk, model, limits, now) {
     const booked = out.booked ?? out.toolCalls.findLast((c) => c.name === 'book' && c.result?.ok)?.result.booking;
     const handover = out.handover ?? out.toolCalls.findLast((c) => c.result?.handover)?.result.handover;
     send(res, 200, { sessionId: id, reply: out.reply.replace(/^(\s*\n)+/, ''),
-      ...(booked ? { booked } : {}), ...(handover ? { handover } : {}) });
+      ...(booked ? { booked } : {}), ...(handover ? { handover } : {}), activity: activityOf(out.toolCalls) });
   };
 }
 
@@ -154,6 +172,11 @@ export function createHttpServer({ desk = createDesk({ store: createMemoryStore(
   const chatRoute = createChatRoute(desk, model, limits, now);
   return http.createServer(async (req, res) => {
     const path = new URL(req.url, 'http://x').pathname;
+    if (path === '/' && (req.method === 'GET' || req.method === 'HEAD')) { // the chat page for people (read per request: a prototype)
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store',
+        'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' }).end(req.method === 'HEAD' ? undefined : readFileSync(PAGE_FILE));
+      return;
+    }
     if (path === '/chat') {
       try { await chatRoute(req, res); } catch (err) {
         console.error('chat request failed:', err);
@@ -185,5 +208,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   console.log(`Bookings and handovers are kept in ${storeFile}`);
   const model = process.env.NEBIUS_API_KEY && process.env.NEBIUS_BASE_URL ? createNebiusModel() : undefined;
   console.log(model ? 'Human door (chat) uses the model on Nebius Token Factory' : 'Human door (chat) is off: NEBIUS_API_KEY or NEBIUS_BASE_URL is not set');
-  createHttpServer({ desk, model }).listen(port, host, () => console.log(`Agent door (MCP) on http://${host}:${port}/mcp`));
+  createHttpServer({ desk, model }).listen(port, host, () => console.log(`Agent door (MCP) on http://${host}:${port}/mcp, chat page on http://${host}:${port}/`));
 }
