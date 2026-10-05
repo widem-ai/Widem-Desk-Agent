@@ -190,7 +190,7 @@ const STR = {
     lead: 'اسأل عن الخدمات والأسعار، أو احجز مكالمة تعارف. المكتب يسعّر من جدول الأسعار مباشرة.',
     starters: ['أبغى أحجز مراجعة سيرة ذاتية، عندي خبرة ٦ سنوات', 'كم سعر باقة السيرة الذاتية مع لينكدإن؟', 'ممكن خصم؟'],
     typing: 'المكتب يكتب', act: 'ما يحدث في المكتب', hint: 'كل ما يفعله المكتب خلف الرد يظهر هنا: التسعير، المواعيد، الحجز، والتحويل لموظف.',
-    quote: 'محرك التسعير', avail: 'فحص المواعيد', book: 'حجز', handover: 'تحويل إلى موظف', list: 'قائمة الخدمات',
+    quote: 'محرك التسعير', avail: 'فحص المواعيد', book: 'حجز', handover: 'تحويل إلى موظف', list: 'قائمة الخدمات', recommend: 'التوصية', choice: 'أزرار الإجابة',
     slots: (n) => `${n} موعد متاح`, subtotal: 'قبل الخصم', discount: 'خصم الباقة', total: 'الإجمالي',
     refused: 'رفض بسبب', sar: 'ريال', turn: (n) => `الرسالة ${n}`,
     busy: 'المكتب مشغول الآن. انتظر دقيقة ثم أعد الإرسال.', down: 'تعذّر الوصول إلى المكتب. تأكد أن الخادم يعمل ثم أعد الإرسال.',
@@ -204,7 +204,7 @@ const STR = {
     lead: 'Ask about services and prices, or book a kickoff call. The desk prices straight from the price list.',
     starters: ['I want to book a CV review, I have 6 years of experience', 'How much is the CV and LinkedIn bundle?', 'Can I get a discount?'],
     typing: 'The desk is typing', act: 'Desk activity', hint: 'Everything the desk does behind a reply shows here: pricing, free slots, bookings and handovers to a person.',
-    quote: 'Quote engine', avail: 'Free slots checked', book: 'Booked', handover: 'Handed to a person', list: 'Service list',
+    quote: 'Quote engine', avail: 'Free slots checked', book: 'Booked', handover: 'Handed to a person', list: 'Service list', recommend: 'Recommendation', choice: 'Answer buttons',
     slots: (n) => `${n} free slots`, subtotal: 'Subtotal', discount: 'Bundle discount', total: 'Total',
     refused: 'Refused:', sar: 'SAR', turn: (n) => `Message ${n}`,
     busy: 'The desk is busy right now. Wait a minute, then send again.', down: 'Could not reach the desk. Check the server is running, then send again.',
@@ -254,7 +254,7 @@ function logActivity(json) {
   if (json.handover && !items.some((a) => a.handover === json.handover.id)) items.push({ tool: 'handover', ok: true, handover: json.handover.id });
   for (const a of items) {
     const li = el('li');
-    li.append(el('span', 'tool', `${s.turn(state.turns)} · ${s[{ quote: 'quote', check_availability: 'avail', book: 'book', handover: 'handover', list_services: 'list' }[a.tool]] ?? a.tool}`));
+    li.append(el('span', 'tool', `${s.turn(state.turns)} · ${s[{ quote: 'quote', check_availability: 'avail', book: 'book', handover: 'handover', list_services: 'list', recommend: 'recommend', ask_choice: 'choice' }[a.tool]] ?? a.tool}`));
     if (!a.ok && !a.handover) li.append(el('div', 'bad', `${s.refused} ${a.code ?? 'error'}`));
     if (a.tool === 'quote' && a.ok) {
       if (a.discount) li.append(el('div', 'num', `${s.subtotal}: ${money(a.subtotal)}`), el('div', 'num', `${s.discount}: ${money(a.discount)}`));

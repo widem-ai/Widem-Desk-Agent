@@ -10,7 +10,7 @@ import { z } from 'zod';
 import { createDesk } from './desk.mjs';
 import { toolsFor, toZodShape } from './tools.mjs';
 import { createChat, createNebiusModel, sorryReply } from './chat.mjs';
-import { widgetsFor, trimSlotLines, pickSlotLine, newWidgetState } from './widgets.mjs';
+import { widgetsFor, trimSlotLines, pickSlotLine, newWidgetState, trimRecReply } from './widgets.mjs';
 import { createFileStore, createMemoryStore } from './store.mjs';
 import { slotLabels } from './labels.mjs';
 
@@ -196,6 +196,8 @@ function createChatRoute(desk, model, limits, now) {
     if (sessions.has(id)) uiStates.set(id, state);
     let reply = out.reply.replace(/^(\s*\n)+/, '');
     if (ui.some((w) => w.type === 'slots')) reply = trimSlotLines(reply) || pickSlotLine(/[؀-ۿ]/.test(message));
+    const recCard = ui.find((w) => w.type === 'recommend'); // the card carries the services and the total
+    if (recCard) reply = trimRecReply(reply, recCard);
     send(res, 200, { sessionId: id, reply,
       ...(booked ? { booked } : {}), ...(handover ? { handover } : {}), activity: activityOf(out.toolCalls), ui });
   };

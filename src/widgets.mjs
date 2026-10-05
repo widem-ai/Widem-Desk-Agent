@@ -3,7 +3,7 @@
 // slots as tappable chips, a quote as a price card, missing pricing details as a picker, and the step before
 // booking as a short contact form.
 import { readFileSync } from 'node:fs';
-import { toWestern } from './guard.mjs';
+import { toWestern, statedAmounts } from './guard.mjs';
 
 const DATA = JSON.parse(readFileSync(new URL('../data/demo-business.json', import.meta.url), 'utf8'));
 const SERVICES = DATA.services.map(({ id, name_en, name_ar }) => ({ id, name_en, name_ar }));
@@ -65,10 +65,11 @@ export function widgetsFor({ toolCalls = [], state = newWidgetState(), booked, h
       ui.push({ type: 'choices', topic: c.result.topic, options: c.result.options });
     }
     if (c.name === 'recommend' && Number.isFinite(c.result.quote?.total)) {
+      // The tier line shows the name only: the years range is long at 390 (Alfred, 2026-10-05).
       const r = c.result; const q = r.quote;
       ui.push({ type: 'recommend', goal: r.goal, goal_line_en: r.goal_line_en, goal_line_ar: r.goal_line_ar,
-        services: r.services, why_en: r.why_en, why_ar: r.why_ar, tier: q.tier, tier_name_en: q.tier_name_en,
-        tier_name_ar: q.tier_name_ar, total: q.total, currency: q.currency ?? DATA.currency, status: r.status, why_status: r.why_status });
+        services: r.services, why_en: r.why_en, why_ar: r.why_ar, tier: q.tier, tier_name_en: String(q.tier_name_en ?? '').split(' (')[0],
+        tier_name_ar: String(q.tier_name_ar ?? '').split(' (')[0], total: q.total, currency: q.currency ?? DATA.currency, status: r.status, why_status: r.why_status });
       next.quoted = true;
     }
     if (c.name === 'quote' && Number.isFinite(c.result.total) && c.keepCard !== false) { // false: the recommendation card stands
@@ -114,6 +115,26 @@ export function trimSlotLines(reply) {
     if (j < lines.length && drop[j]) drop[i] = true; // "Free times:" followed by the dropped list
   }
   return lines.filter((_, i) => !drop[i]).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+const BOOKING_ASK = /موعد|احجز|حجز|اختر|اختيار|book|pick|time/i;
+/** The reply under a recommendation card, trimmed: sentences that state an amount go (the card carries the total),
+ * and so do sentences that only restate a recommended service (not the goal sentence, not the booking ask). When
+ * nothing is left, the card's goal line. Live run 2026-10-05: the model restated "السعر الإجمالي هو 550 ريال". */
+export function trimRecReply(reply, card) {
+  if (typeof reply !== 'string') return reply;
+  const goal = [card.goal_line_en, card.goal_line_ar].map((l) => String(l ?? '').split(': ')[1]?.toLowerCase()).filter(Boolean);
+  const names = (card.services ?? []).flatMap((s) => [s.name_en, s.name_ar]).filter(Boolean).map((n) => n.toLowerCase());
+  const parts = reply.match(/[^.!?؟\n]+[.!?؟]*\s*/g) ?? [];
+  const kept = parts.filter((p) => {
+    if (statedAmounts(p).length) return false;
+    const t = p.toLowerCase();
+    const service = names.some((n) => t.includes(n));
+    return !service || goal.some((g) => t.includes(g)) || BOOKING_ASK.test(p);
+  });
+  const out = kept.join('').trim();
+  if (out) return out;
+  return (/[؀-ۿ]/.test(reply) ? card.goal_line_ar : card.goal_line_en) + '.';
 }
 
 /** A one-line reply when trimming left nothing, in the customer's language. */
