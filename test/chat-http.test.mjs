@@ -201,3 +201,32 @@ test('history is capped: the oldest turns are trimmed, starting at a customer me
     assert.ok(!last.some((m) => m.content === 'message 1'));
   }, { limits });
 });
+
+test('POST /chat/pay: the demo pay button marks this session\'s booking paid and the desk confirms reference, slot and amount', async () => {
+  const model = scriptedModel([
+    toolCall('c0', 'check_availability', { from: '2026-10-06', days: 1 }),
+    { role: 'assistant', content: 'Pick a time below.' },
+    toolCall('c1', 'book', { ...ORDER, slot: SLOT, customer_name: 'Sara', contact: 'sara@example.com' }),
+    { role: 'assistant', content: 'Your time is held. Pay below to confirm it.' },
+  ]);
+  await withServer(model, async ({ customer, store, url }) => {
+    const say = customer();
+    await say('Full career pack, 10 years');
+    const held = await say('Tuesday 10:00, Sara, sara@example.com');
+    assert.deepEqual(held.json.ui.map((w) => w.type), ['pay']);
+    const pay = async (body) => {
+      const res = await fetch(`${url}/pay`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+      return { status: res.status, json: await res.json() };
+    };
+    assert.equal((await pay({})).status, 400, 'a session is required');
+    assert.equal((await pay({ sessionId: 'not-issued' })).status, 400);
+    const [booking] = store.all('bookings');
+    assert.equal(booking.status, 'awaiting_payment');
+    const paid = await pay({ sessionId: held.json.sessionId });
+    assert.equal(paid.status, 200);
+    assert.equal(store.all('bookings')[0].status, 'paid');
+    for (const part of [booking.reference, '10:00', String(booking.price_quoted)]) assert.ok(paid.json.reply.includes(part), paid.json.reply);
+    assert.deepEqual(paid.json.ui, []);
+    assert.equal((await pay({ sessionId: held.json.sessionId })).status, 409, 'nothing left to pay');
+  });
+});

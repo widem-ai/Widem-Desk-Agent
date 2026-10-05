@@ -12,6 +12,9 @@ import { TOOLS, toZodShape } from './tools.mjs';
 import { createChat, createNebiusModel, sorryReply } from './chat.mjs';
 import { widgetsFor, trimSlotLines, pickSlotLine, newWidgetState } from './widgets.mjs';
 import { createFileStore, createMemoryStore } from './store.mjs';
+import { slotLabels } from './labels.mjs';
+
+const AVAILABILITY = JSON.parse(readFileSync(new URL('../data/demo-business.json', import.meta.url), 'utf8')).availability;
 
 const MAX_BODY_BYTES = 64 * 1024;
 const AGENT = { door: 'agent' };
@@ -122,11 +125,37 @@ function createChatRoute(desk, model, limits, now) {
   const perIp = createBuckets(limits.perIp.messages, limits.perIp.windowMs, now);
   const global = createBuckets(limits.global.messages, limits.global.windowMs, now);
   const newSessions = createBuckets(limits.newSessionsPerIp.count, limits.newSessionsPerIp.windowMs, now);
+  /** POST /chat/pay { sessionId }: the demo pay button. Pays the booking this session is holding (never one named by
+   * the client), then the desk confirms with the reference, slot and amount. Simulated: no card details, no charge. */
+  function pay({ sessionId }, req, res, fail) {
+    if (typeof sessionId !== 'string' || !sessions.has(sessionId)) { fail(400, 'Send the sessionId of this chat.', 'unknown_session'); return; }
+    const wait = perIp.take(req.socket.remoteAddress ?? 'unknown');
+    if (wait) { res.setHeader('retry-after', String(wait)); send(res, 429, { error: { code: 'rate_limited' }, reply: BUSY_REPLY }); return; }
+    const state = uiStates.get(sessionId) ?? newWidgetState();
+    if (!state.awaitingPayment) { fail(409, 'Nothing is waiting for payment in this chat.', 'nothing_to_pay'); return; }
+    const history = sessions.get(sessionId);
+    const arabic = /[؀-ۿ]/.test(history.findLast((m) => m.role === 'user')?.content ?? '');
+    const out = desk.pay(state.awaitingPayment, { door: 'human' });
+    uiStates.set(sessionId, { ...state, awaitingPayment: undefined });
+    let reply;
+    if (!out.ok) {
+      reply = arabic ? 'انتهت مهلة الدفع لهذا الموعد. اختر موعدًا جديدًا لنحجزه لك.' : 'The time was held for payment and the hold ran out. Pick a new time and I will book it.';
+    } else {
+      const b = out.booking;
+      const { label_en, label_ar } = slotLabels(b.slot.start, b.slot.end, AVAILABILITY);
+      reply = arabic ? `تم الدفع (تجريبي) وتأكد حجزك: ${b.reference}، ${label_ar}، ${b.amount_due} ريال.`
+        : `Paid (demo) and confirmed: ${b.reference}, ${label_en}, ${b.amount_due} SAR.`;
+    }
+    history.push({ role: 'assistant', content: reply });
+    send(res, 200, { sessionId, reply, ...(out.ok ? { paid: out.booking } : { error: out.error }), ui: [] });
+  }
+
   return async (req, res) => {
     const fail = (status, message, code = 'bad_request') => send(res, status, { error: { code, message } });
     if (req.method !== 'POST') { fail(405, 'Use POST', 'method_not_allowed'); return; }
     const body = await readJson(req, fail);
     if (body.done) return;
+    if (new URL(req.url, 'http://x').pathname === '/chat/pay') { pay(body.value ?? {}, req, res, fail); return; }
     const { sessionId, message } = body.value ?? {};
     if ((sessionId !== undefined && (typeof sessionId !== 'string' || sessionId.length > 100))
       || typeof message !== 'string' || !message.trim() || message.length > MAX_MESSAGE_CHARS) {
@@ -184,7 +213,7 @@ export function createHttpServer({ desk = createDesk({ store: createMemoryStore(
         'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' }).end(req.method === 'HEAD' ? undefined : readFileSync(PAGE_FILE));
       return;
     }
-    if (path === '/chat') {
+    if (path === '/chat' || path === '/chat/pay') {
       try { await chatRoute(req, res); } catch (err) {
         console.error('chat request failed:', err);
         if (!res.headersSent) send(res, 500, { error: { code: 'internal_error' } });
