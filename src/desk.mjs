@@ -217,10 +217,12 @@ export function createDesk({ store, now = () => new Date() }) {
 
     /** Demo payment: mark a booking awaiting payment as paid. No card details, nothing charged. Only the door that
      * booked it may; paying twice changes nothing; a hold that ran out is refused (its slot may be someone else's now). */
-    pay(reference, ctx) {
+    pay(reference, ctx, proof = {}) {
       const d = door(ctx);
       const booking = store.all('bookings').find((b) => b.reference === reference);
-      if (!booking || booking.door !== d) return refuse('unknown_booking', `No ${d} booking ${reference}.`);
+      // The agent door is stateless, so an agent proves the booking is its own with the contact it booked with.
+      const mismatch = proof.contact !== undefined && booking && booking.contact !== cap(proof.contact, 200);
+      if (!booking || booking.door !== d || mismatch) return refuse('unknown_booking', `No ${d} booking ${reference}.`);
       if (booking.status === 'paid') return { ok: true, demo: true, booking };
       if (booking.status !== 'awaiting_payment' || !holds(booking)) {
         return refuse('hold_expired', 'The time was held for payment and the hold ran out. Book a free slot again.');

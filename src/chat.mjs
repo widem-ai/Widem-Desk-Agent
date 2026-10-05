@@ -1,7 +1,9 @@
 // The human door's brain: a chat loop where the model talks to a customer and calls the same desk
 // tools as the agent door, in-process. Every tool result comes from the desk, never from the model.
 import { readFileSync } from 'node:fs';
-import { TOOLS, checkArgs, toJsonSchema } from './tools.mjs';
+import { toolsFor, checkArgs, toJsonSchema } from './tools.mjs';
+
+const TOOLS = toolsFor('human'); // never the agent-only pay tool: people pay with the button
 import { toWestern, ungrounded, paymentClaims } from './guard.mjs';
 import { slotLabels } from './labels.mjs';
 import { latinWords, arabicWords } from './latin.mjs';
@@ -9,6 +11,16 @@ import { latinWords, arabicWords } from './latin.mjs';
 const HUMAN = { door: 'human' };
 const DATA = JSON.parse(readFileSync(new URL('../data/demo-business.json', import.meta.url), 'utf8'));
 const HO = DATA.handover;
+// Handover reasons that share one acknowledgement line.
+const ACK_KEY = { unknown_tier: 'unknown_service', unknown_addon: 'unknown_service', addon_not_applicable: 'unknown_service',
+  hidden_instructions: 'guarded' };
+
+/** What the customer is told on a handover (Mohannad, 2026-10-05, choice 2 = a): one acknowledgement line chosen in
+ * code from the reason, then the fixed line. Never the model's text. */
+export function handoverReply(reason, arabic) {
+  const ack = HO.acknowledge[ACK_KEY[reason] ?? reason] ?? HO.acknowledge.out_of_rules;
+  return arabic ? `${ack.ar} ${HO.tell_customer_ar}` : `${ack.en} ${HO.tell_customer_en}`;
+}
 const AV = DATA.availability;
 export const DEFAULT_MODEL = 'nvidia/nemotron-3-super-120b-a12b';
 const ARABIC = /[؀-ۿ]/;
@@ -194,7 +206,7 @@ export function createChat({ desk, model, maxRounds = 6 }) {
       // Stop and pass the customer to a person, with the conversation the customer actually saw.
       const handOver = (summary, flag) => {
         const { handover } = desk.handover({ reason: 'out_of_rules', transcript: transcriptOf(messages), summary }, HUMAN);
-        const reply = ARABIC.test(text) ? HO.tell_customer_ar : HO.tell_customer_en;
+        const reply = handoverReply(flag === 'guarded' ? 'guarded' : 'out_of_rules', ARABIC.test(text));
         messages.push({ role: 'assistant', content: reply });
         return finish({ reply, toolCalls, modelId, [flag]: true, handover, history: visible() });
       };
@@ -205,6 +217,12 @@ export function createChat({ desk, model, maxRounds = 6 }) {
         const message = out.message.tool_calls?.length ? out.message : { ...out.message, content: arabicWords(arabicPunctuation(plainDashes(plainMarkdown(out.message.content)))) };
         messages.push(message);
         if (!message.tool_calls?.length) {
+          // A handover this turn (by the model or by a tool refusal) ends the line: the reply is built in code.
+          const handed = toolCalls.findLast((c) => c.result?.handover)?.result.handover;
+          if (handed) {
+            message.content = handoverReply(handed.reason, ARABIC.test(text));
+            return finish({ reply: message.content, toolCalls, modelId, history: visible() });
+          }
           // Every SAR amount and time in the reply must be one a desk tool returned in this session.
           const results = messages.filter((m) => m.role === 'tool').map((m) => JSON.parse(m.content));
           // And no claim that the call is free or that nothing is due now: payment is taken at booking.

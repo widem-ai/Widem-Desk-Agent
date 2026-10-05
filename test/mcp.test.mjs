@@ -49,7 +49,7 @@ const call = (name, args) => client.callTool({ name, arguments: args });
 
 test('the agent door lists exactly the five tools', async () => {
   const { tools } = await client.listTools();
-  assert.deepEqual(tools.map((t) => t.name).sort(), ['book', 'check_availability', 'handover', 'list_services', 'quote']);
+  assert.deepEqual(tools.map((t) => t.name).sort(), ['book', 'check_availability', 'handover', 'list_services', 'pay', 'quote']);
   for (const t of tools) assert.ok(t.description.length > 20, `${t.name} needs a description an agent can act on`);
 });
 

@@ -122,8 +122,17 @@
   },
   "handover": {
     "refusal_codes": ["unknown_service", "unknown_tier", "unknown_addon", "addon_not_applicable"],
-    "reasons": ["unknown_service", "unknown_tier", "unknown_addon", "addon_not_applicable", "talk_to_a_person", "out_of_rules"],
+    "reasons": ["unknown_service", "unknown_tier", "unknown_addon", "addon_not_applicable", "talk_to_a_person", "discount", "complaint", "hidden_instructions", "out_of_rules"],
     "default_reason": "out_of_rules",
+    "acknowledge_note": "One line said before tell_customer, chosen in code from the handover reason (Mohannad, 2026-10-05). Never model text.",
+    "acknowledge": {
+      "discount": { "en": "I understand you are asking about a discount, which I cannot set here.", "ar": "أفهم أنك تسأل عن خصم، وهذا لا أستطيع تحديده هنا." },
+      "complaint": { "en": "I am sorry to hear there was a problem with your order.", "ar": "يؤسفني أن طلبك واجه مشكلة." },
+      "unknown_service": { "en": "That is not a service I can price here.", "ar": "هذه ليست من الخدمات التي أستطيع تسعيرها هنا." },
+      "talk_to_a_person": { "en": "Of course, I will pass you to a person.", "ar": "بالتأكيد، سأحوّلك إلى أحد أعضاء الفريق." },
+      "guarded": { "en": "I can only help within the studio's rules here.", "ar": "أستطيع المساعدة هنا ضمن قواعد الاستوديو فقط." },
+      "out_of_rules": { "en": "That is outside what I can handle here.", "ar": "هذا خارج ما أستطيع التعامل معه هنا." }
+    },
     "tell_customer_en": "A member of the team will reply to you personally. Nothing has been booked or charged yet.",
     "tell_customer_ar": "سيتواصل معك أحد أعضاء الفريق شخصيًا. لم يتم أي حجز أو دفع حتى الآن."
   }

@@ -104,7 +104,7 @@ test('a reply that says the call is free is stopped like an invented price: corr
   const out = await createChat({ desk, model }).respond([], 'كم سعر المكالمة؟');
   assert.equal(seen.length, 2);
   assert.equal(out.guarded, true);
-  assert.equal(out.reply, DATA.handover.tell_customer_ar);
+  assert.equal(out.reply, `${DATA.handover.acknowledge.guarded.ar} ${DATA.handover.tell_customer_ar}`);
 });
 
 test('the prompt and the book tool tell the model a booking is held until paid and to point to the pay button', async () => {
@@ -115,4 +115,44 @@ test('the prompt and the book tool tell the model a booking is held until paid a
     assert.match(text, /pay button below/i);
   }
   assert.match(SYSTEM_PROMPT, /never say .*booked.* before/i);
+});
+
+test('every handover reason has a bilingual acknowledgement line in the data, and none is free text', () => {
+  const ack = DATA.handover.acknowledge;
+  for (const key of ['discount', 'complaint', 'unknown_service', 'talk_to_a_person', 'guarded', 'out_of_rules']) {
+    assert.ok(ack[key]?.en && /[؀-ۿ]/.test(ack[key]?.ar ?? ''), key);
+    assert.ok(!/[–—]/.test(ack[key].en + ack[key].ar), `${key}: no dashes`);
+  }
+  for (const r of ['discount', 'complaint', 'hidden_instructions']) assert.ok(DATA.handover.reasons.includes(r), r);
+});
+
+test('the agent door gets a demo pay tool with the same rules; the chat model never sees it', async () => {
+  const { TOOLS } = await import('../src/tools.mjs');
+  const { CHAT_TOOLS } = await import('../src/chat.mjs');
+  const pay = TOOLS.find((t) => t.name === 'pay');
+  assert.deepEqual(pay.doors, ['agent']);
+  assert.ok(!CHAT_TOOLS.some((t) => t.function.name === 'pay'), 'customers pay with the button, not the model');
+  const { clock, desk } = clockDesk();
+  const AGENT = { door: 'agent' };
+  const slot = desk.checkAvailability({ from: '2026-10-06', days: 1 }).slots[0].start;
+  const ref = desk.book({ ...ORDER, slot, customer_name: 'Bot Test', contact: 'bot@example.com' }, AGENT).booking.reference;
+  assert.equal(pay.run(desk, { reference: ref, contact: 'other@example.com' }, AGENT).error.code, 'unknown_booking', 'the contact it booked with is the proof');
+  assert.equal(pay.run(desk, { reference: ref, contact: 'bot@example.com' }, HUMAN).error.code, 'unknown_booking', 'only the door that booked');
+  assert.equal(pay.run(desk, { reference: ref, contact: 'bot@example.com' }, AGENT).booking.status, 'paid');
+  assert.equal(pay.run(desk, { reference: ref, contact: 'bot@example.com' }, AGENT).booking.status, 'paid', 'idempotent');
+  const slot2 = desk.checkAvailability({ from: '2026-10-06', days: 1 }).slots[0].start;
+  const ref2 = desk.book({ ...ORDER, slot: slot2, customer_name: 'Bot Test', contact: 'bot@example.com' }, AGENT).booking.reference;
+  clock.t += (PAY.hold_minutes + 1) * 60_000;
+  assert.equal(pay.run(desk, { reference: ref2, contact: 'bot@example.com' }, AGENT).error.code, 'hold_expired');
+});
+
+test('a chat model that calls pay by name gets unknown_tool and nothing is paid', async () => {
+  const { desk } = clockDesk();
+  const { out } = bookFirst(desk);
+  const calls = [{ role: 'assistant', content: null, tool_calls: [{ id: 'p', type: 'function', function: { name: 'pay', arguments: JSON.stringify({ reference: out.booking.reference, contact: 'sara@example.com' }) } }] },
+    { role: 'assistant', content: 'Done.' }];
+  let i = 0;
+  const model = { async complete() { return { message: calls[Math.min(i++, 1)], modelId: 'fake' }; } };
+  const r = await createChat({ desk, model }).respond([], 'pay it');
+  assert.equal(r.toolCalls[0].result.error.code, 'unknown_tool');
 });

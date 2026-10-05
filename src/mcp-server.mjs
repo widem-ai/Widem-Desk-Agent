@@ -8,7 +8,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
 import { createDesk } from './desk.mjs';
-import { TOOLS, toZodShape } from './tools.mjs';
+import { toolsFor, toZodShape } from './tools.mjs';
 import { createChat, createNebiusModel, sorryReply } from './chat.mjs';
 import { widgetsFor, trimSlotLines, pickSlotLine, newWidgetState } from './widgets.mjs';
 import { createFileStore, createMemoryStore } from './store.mjs';
@@ -26,7 +26,7 @@ const asResult = (value, isError = false) => ({
 
 export function createMcpServer(desk) {
   const server = new McpServer({ name: 'widem-agent-desk', version: '0.1.0' });
-  for (const tool of TOOLS) {
+  for (const tool of toolsFor('agent')) {
     server.registerTool(tool.name, {
       title: tool.title,
       description: tool.description,
