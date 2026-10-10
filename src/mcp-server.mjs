@@ -13,7 +13,7 @@ import { createChat, createNebiusModel, sorryReply, langFromEnv } from './chat.m
 import { widgetsFor, trimSlotLines, pickSlotLine, newWidgetState, trimRecReply } from './widgets.mjs';
 import { createFileStore, createMemoryStore } from './store.mjs';
 import { slotLabels } from './labels.mjs';
-import { createOwnerRoute, OWNER_LIMITS } from './owner.mjs';
+import { createOwnerRoute, OWNER_LIMITS, MIN_TOKEN_LENGTH } from './owner.mjs';
 
 const AVAILABILITY = JSON.parse(readFileSync(new URL('../data/demo-business.json', import.meta.url), 'utf8')).availability;
 
@@ -299,7 +299,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const lang = langFromEnv();
   const trustProxy = process.env.TRUST_PROXY === 'cloudflare' ? 'cloudflare' : 'none';
   const ownerToken = process.env.OWNER_TOKEN || undefined;
-  console.log(`Owner page: ${ownerToken ? 'on at /owner (OWNER_TOKEN set)' : 'off (OWNER_TOKEN not set)'}`);
+  console.log(`Owner page: ${!ownerToken ? 'off (OWNER_TOKEN not set)' : ownerToken.length < MIN_TOKEN_LENGTH
+    ? 'owner page off: OWNER_TOKEN too short (need 32+)' : 'on at /owner (OWNER_TOKEN set)'}`); // never the token or its length
   console.log(`Client IP: ${trustProxy === 'cloudflare' ? 'CF-Connecting-IP (TRUST_PROXY=cloudflare; listen on 127.0.0.1 only)' : 'the socket address (TRUST_PROXY unset)'}`);
   console.log(`Desk language: ${lang} (DESK_LANG=ar for the bilingual desk)`);
   createHttpServer({ desk, model, lang, trustProxy, ownerToken }).listen(port, host, () => console.log(`Agent door (MCP) on http://${host}:${port}/mcp, chat page on http://${host}:${port}/`));

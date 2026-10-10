@@ -8,7 +8,30 @@ import { RULES } from './core.mjs';
 
 export const OWNER_LIMITS = {
   failedPerIp: { count: 5, windowMs: 15 * 60_000 }, // 5 wrong tokens per address per 15 minutes, then 429
+  failedGlobal: { count: 30, windowMs: 15 * 60_000 }, // 30 across all addresses: then every sign-in is locked
+  maxTrackedAddresses: 10_000, // past this the oldest addresses are forgotten
 };
+/** Shorter tokens leave the page off: it guards customer contacts. */
+export const MIN_TOKEN_LENGTH = 32;
+const TZ = RULES.availability.timezone;
+const whenFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, weekday: 'short', day: 'numeric', month: 'short',
+  hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+/** "Sun 4 Oct, 08:00 Riyadh time" for an ISO instant; the raw value if it is not one. */
+const when = (iso) => (Number.isNaN(Date.parse(iso)) ? String(iso ?? '')
+  : `${whenFmt.format(new Date(iso))} Riyadh time`);
+
+/** The bucket for an address: IPv4 (also IPv4-mapped IPv6) as itself, any other IPv6 by its /64, since one
+ * customer line usually gets a whole /64 and could otherwise rotate through it. */
+export function addressKey(ip) {
+  const s = String(ip ?? 'unknown').trim().toLowerCase().split('%')[0];
+  if (s.startsWith('::ffff:') && s.includes('.')) return s.slice(7);
+  if (!s.includes(':')) return s;
+  const [head, tail = ''] = s.split('::');
+  const h = head ? head.split(':') : [];
+  const t = s.includes('::') && tail ? tail.split(':') : [];
+  const groups = s.includes('::') ? [...h, ...Array(Math.max(0, 8 - h.length - t.length)).fill('0'), ...t] : h;
+  return `${groups.slice(0, 4).map((g) => (parseInt(g, 16) || 0).toString(16)).join(':')}::/64`;
+}
 const MAX_FORM_BYTES = 4096;
 
 const HEADERS = {
@@ -29,16 +52,43 @@ const digest = (s) => createHash('sha256').update(String(s)).digest();
 const sameToken = (given, expected) => typeof given === 'string' && given.length > 0
   && timingSafeEqual(digest(given), digest(expected));
 
-/** Failed attempts per address within a window. */
-function createFailures({ count, windowMs }, now) {
+/** Failed attempts per address and across all addresses, each within its window. The per-address map forgets
+ * expired entries and never holds more than maxTrackedAddresses (the least recently failing go first). */
+export function createFailures({ failedPerIp, failedGlobal, maxTrackedAddresses }, now, onLock = () => {}) {
   const seen = new Map();
-  const recent = (ip) => (seen.get(ip) ?? []).filter((t) => now() - t < windowMs);
+  let all = [];
+  let lockReported = false;
+  const recent = (key) => (seen.get(key) ?? []).filter((t) => now() - t < failedPerIp.windowMs);
+  // Global failure times, oldest first: expired ones leave from the front, and more than count are never needed.
+  const recentAll = () => {
+    while (all.length && (now() - all[0] >= failedGlobal.windowMs || all.length > failedGlobal.count)) all.shift();
+    return all;
+  };
+  // The map is ordered by last failure, so expired addresses are always at the front: drop from the front while
+  // the first one has expired or the map is over its cap. Cheap per call, however many addresses there are.
+  function prune() {
+    for (const [key, list] of seen) {
+      if (seen.size > maxTrackedAddresses || now() - list.at(-1) >= failedPerIp.windowMs) seen.delete(key);
+      else break;
+    }
+  }
   return {
-    blocked: (ip) => recent(ip).length >= count,
-    add(ip) {
-      seen.set(ip, [...recent(ip), now()]);
-      if (seen.size > 10_000) seen.delete(seen.keys().next().value);
+    locked() {
+      const on = recentAll().length >= failedGlobal.count;
+      if (!on) lockReported = false;
+      return on;
     },
+    blocked: (ip) => recent(addressKey(ip)).length >= failedPerIp.count,
+    add(ip) {
+      const key = addressKey(ip);
+      const list = [...recent(key), now()];
+      seen.delete(key); // re-inserted at the end: the map's order is least recently failing first
+      seen.set(key, list);
+      prune();
+      all.push(now());
+      if (recentAll().length >= failedGlobal.count && !lockReported) { lockReported = true; onLock(); }
+    },
+    size: () => seen.size,
   };
 }
 
@@ -102,7 +152,7 @@ function bookingCard(b, now) {
   const slot = b.slot?.start && b.slot?.end ? slotLabels(b.slot.start, b.slot.end, RULES.availability).label_en : '';
   return `<article class="card" data-door="${esc(b.door)}">
 <div class="row"><span class="ref">${esc(b.reference)}</span><span class="tag">${b.door === 'agent' ? 'Agent door' : 'Chat door'}</span>
-<span class="tag ${kind}">${esc(status)}</span><span class="muted">${esc(b.created_at)}</span></div>
+<span class="tag ${kind}">${esc(status)}</span><span class="muted">${esc(when(b.created_at))}</span></div>
 <dl><dt>Customer</dt><dd>${esc(b.customer_name)}</dd><dt>Contact</dt><dd>${esc(b.contact)}</dd>
 <dt>Service</dt><dd>${esc(services)}</dd><dt>Tier</dt><dd>${esc(b.quote?.tier_name_en ?? b.tier)}</dd>
 <dt>Price</dt><dd>${esc(b.price_quoted)} ${esc(b.currency)}</dd><dt>Slot</dt><dd>${esc(slot)}</dd></dl>
@@ -112,7 +162,7 @@ ${transcript(b.transcript)}</article>`;
 function handoverCard(h) {
   return `<article class="card" data-door="${esc(h.door)}">
 <div class="row"><span class="ref">${esc(h.id)}</span><span class="tag">${h.door === 'agent' ? 'Agent door' : 'Chat door'}</span>
-<span class="tag warn">${esc(h.reason_given ?? h.reason)}</span><span class="muted">${esc(h.created_at)}</span></div>
+<span class="tag warn">${esc(h.reason_given ?? h.reason)}</span><span class="muted">${esc(when(h.created_at))}</span></div>
 <dl><dt>Customer</dt><dd>${esc(h.customer_name ?? '')}</dd><dt>Contact</dt><dd>${esc(h.contact ?? '')}</dd>
 <dt>Summary</dt><dd>${esc(h.summary ?? '')}</dd></dl>${transcript(h.transcript)}</article>`;
 }
@@ -131,10 +181,12 @@ export function renderOwnerPage({ bookings, handovers }, now) {
 
 /** GET /owner (token in an Authorization: Bearer header) or POST /owner (form field token). */
 export function createOwnerRoute({ desk, token, limits = OWNER_LIMITS, now = Date.now, ipOf }) {
-  const failures = createFailures(limits.failedPerIp, now);
+  const failures = createFailures({ ...OWNER_LIMITS, ...limits }, now,
+    () => console.error('owner sign-in locked: too many failures')); // nothing else: no IPs, no tokens
+  const enabled = typeof token === 'string' && token.length >= MIN_TOKEN_LENGTH;
   const send = (res, status, html) => res.writeHead(status, HEADERS).end(html);
   return async (req, res) => {
-    if (!token) { res.writeHead(404).end(); return; } // not configured: the page does not exist
+    if (!enabled) { res.writeHead(404).end(); return; } // not configured, or too weak: the page does not exist
     if (req.method !== 'GET' && req.method !== 'POST') { res.writeHead(405, { allow: 'GET, POST' }).end(); return; }
     let given;
     if (req.method === 'POST') {
@@ -147,6 +199,7 @@ export function createOwnerRoute({ desk, token, limits = OWNER_LIMITS, now = Dat
     }
     if (given === undefined || given === null) { send(res, 200, loginPage()); return; } // a plain visit: the form
     const ip = ipOf(req);
+    if (failures.locked()) { send(res, 429, loginPage('Sign-in is locked for a while. Try again later.')); return; }
     if (failures.blocked(ip)) { send(res, 429, loginPage('Too many wrong tokens. Try again later.')); return; }
     if (!sameToken(given, token)) {
       failures.add(ip);

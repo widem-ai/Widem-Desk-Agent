@@ -3,19 +3,20 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHttpServer } from '../src/mcp-server.mjs';
+import { createFailures, addressKey } from '../src/owner.mjs';
 import { createDesk } from '../src/desk.mjs';
 import { createMemoryStore } from '../src/store.mjs';
 import { PROFILES } from './profiles.mjs';
 
 const NOW = '2026-10-04T08:00:00+03:00'; // Sunday, before opening
-const TOKEN = 'test-owner-token-not-a-real-one';
+const TOKEN = 'test-owner-token-not-a-real-one-0123456789'; // 32+ characters, as the page requires
 const ORDER = PROFILES[0].order;
 
-async function open({ ownerToken, ownerLimits, seed } = {}) {
+async function open({ ownerToken, ownerLimits, seed, trustProxy } = {}) {
   const store = createMemoryStore();
   const desk = createDesk({ store, now: () => new Date(NOW) });
   seed?.(desk);
-  const server = createHttpServer({ desk, ownerToken, ownerLimits, now: () => Date.parse(NOW) });
+  const server = createHttpServer({ desk, ownerToken, ownerLimits, trustProxy, now: () => Date.parse(NOW) });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
   return { base, close: () => new Promise((resolve) => server.close(resolve)) };
@@ -97,5 +98,60 @@ test('customer text is escaped: a name holding a script tag is shown as text', a
     assert.doesNotMatch(html, /<img src=x/);
     assert.doesNotMatch(html, /"><b>x<\/b>/);
     assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+  } finally { await door.close(); }
+});
+
+// E4b: limits that many addresses cannot get around, a token strong enough to guard contacts, bounded memory.
+const fromIp = (base, token, ip) => fetch(`${base}/owner`, { headers: { authorization: `Bearer ${token}`, 'cf-connecting-ip': ip } });
+
+test('distributed guessing from 40 addresses hits the global lock; then even the right token gets 429; one log line, no IPs', async (t) => {
+  const logged = [];
+  t.mock.method(console, 'error', (...args) => logged.push(args.join(' ')));
+  const door = await open({ ownerToken: TOKEN, seed: seedBothDoors, trustProxy: 'cloudflare' });
+  try {
+    const statuses = [];
+    for (let i = 1; i <= 40; i += 1) statuses.push((await fromIp(door.base, `guess-${i}`, `203.0.113.${i}`)).status);
+    assert.deepEqual(statuses.slice(0, 30), Array(30).fill(401), 'the first 30 failures are plain 401s');
+    assert.deepEqual(statuses.slice(30), Array(10).fill(429), 'after 30 failures across addresses everyone is locked');
+    const right = await fromIp(door.base, TOKEN, '198.51.100.7');
+    assert.equal(right.status, 429);
+    assert.doesNotMatch(await right.text(), /Human Customer/);
+    assert.deepEqual(logged, ['owner sign-in locked: too many failures']);
+  } finally { await door.close(); }
+});
+
+test('a token shorter than 32 characters keeps the page off (404), even when it is sent', async () => {
+  const short = 'only-twenty-eight-characters';
+  const door = await open({ ownerToken: short, seed: seedBothDoors });
+  try {
+    assert.equal((await withHeader(door.base, short)).status, 404);
+    assert.equal((await withForm(door.base, short)).status, 404);
+  } finally { await door.close(); }
+});
+
+test('the failure map stays at or under its cap after 20,000 distinct failing addresses', () => {
+  let t = 0;
+  const f = createFailures({ failedPerIp: { count: 5, windowMs: 60_000 }, failedGlobal: { count: 1e9, windowMs: 60_000 },
+    maxTrackedAddresses: 100 }, () => t);
+  for (let i = 0; i < 20_000; i += 1) { t += 1; f.add(`10.${i >> 16}.${(i >> 8) & 255}.${i & 255}`); }
+  assert.ok(f.size() <= 100, `size ${f.size()}`);
+  t += 120_000; // every entry has expired
+  f.add('192.0.2.1');
+  assert.equal(f.size(), 1, 'expired addresses are pruned');
+});
+
+test('an IPv6 address counts by its /64; IPv4 and IPv4-mapped addresses count as themselves', () => {
+  assert.equal(addressKey('2001:db8:1:2:aaaa::1'), addressKey('2001:DB8:1:2:ffff:1:2:3'));
+  assert.notEqual(addressKey('2001:db8:1:2::1'), addressKey('2001:db8:1:3::1'));
+  assert.equal(addressKey('::ffff:203.0.113.9'), '203.0.113.9');
+  assert.notEqual(addressKey('203.0.113.9'), addressKey('203.0.113.10'));
+});
+
+test('the booking and handover times are shown in Riyadh time, not raw UTC', async () => {
+  const door = await open({ ownerToken: TOKEN, seed: seedBothDoors });
+  try {
+    const html = await (await withHeader(door.base, TOKEN)).text();
+    assert.doesNotMatch(html, /T05:00:00\.000Z/);
+    assert.match(html, /Sun 4 Oct, 08:00 Riyadh time/);
   } finally { await door.close(); }
 });
