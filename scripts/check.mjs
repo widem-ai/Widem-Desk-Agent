@@ -77,7 +77,8 @@ async function readmeGate() {
   const { toolsFor } = await import(`${pathToFileURL(join(ROOT, 'src/tools.mjs')).href}?t=${Date.now()}`);
   const names = toolsFor('agent').map((t) => t.name);
   const readme = readFileSync(join(ROOT, 'README.md'), 'utf8');
-  const missing = names.filter((n) => !readme.includes(`\`${n}\``));
+  // Each tool needs its own row in the tools table, not just a mention somewhere in the text.
+  const missing = names.filter((n) => !readme.includes(`| \`${n}\` |`));
   const ok = names.length === 6 && missing.length === 0;
   return { ok, line: ok ? `readme: names all 6 agent-door tools (${names.join(', ')})`
     : `readme: ${names.length} agent-door tools in code; missing from README: ${missing.join(', ') || 'none'}` };
