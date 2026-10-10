@@ -72,9 +72,16 @@ function slotsOn(date) {
 }
 
 // --- the desk ----------------------------------------------------------------------------------
-export function createDesk({ store, now = () => new Date() }) {
+// One caller (ctx.client: the IP a door saw) may hold at most this many bookings at once, held or paid. A real customer
+// books one kickoff call; 3 leaves room to rebook or book for a colleague. The calendar has about 100 slots over its
+// 21 days, so emptying it now needs 30+ addresses instead of one script.
+export const MAX_ACTIVE_BOOKINGS_PER_CLIENT = 3;
+
+export function createDesk({ store, now = () => new Date(), maxActivePerClient = MAX_ACTIVE_BOOKINGS_PER_CLIENT }) {
   if (!store) throw new Error('createDesk needs a store');
   const nowMs = () => now().getTime();
+  // Which booking references each caller made. In memory: a restart forgets it (the slots stay taken).
+  const byClient = new Map();
 
   function door(ctx) {
     if (!DOORS.includes(ctx?.door)) throw new Error(`desk: door must be one of ${DOORS.join(', ')}`);
@@ -84,7 +91,12 @@ export function createDesk({ store, now = () => new Date() }) {
   // A slot is taken by a paid booking, or by one awaiting payment whose hold has not run out (data: payment.hold_minutes).
   const holds = (b) => b.status === 'paid' || b.status === 'booked'
     || (b.status === 'awaiting_payment' && Date.parse(b.hold_until) > nowMs());
-  const takenStarts = () => new Set(store.all('bookings').filter(holds).map((b) => Date.parse(b.slot.start)));
+  /** How many of this caller's bookings still hold a slot (paid, or awaiting payment inside the hold). */
+  function activeFor(client) {
+    const refs = new Set(byClient.get(client) ?? []);
+    return store.all('bookings').filter((b) => refs.has(b.reference) && holds(b)).length;
+  }
+  const takenStarts = () =>new Set(store.all('bookings').filter(holds).map((b) => Date.parse(b.slot.start)));
 
   /** Is instant t a bookable slot now: on the grid, open, not started, inside the booking window? */
   function bookable(t, current) {
@@ -172,6 +184,13 @@ export function createDesk({ store, now = () => new Date() }) {
      */
     book(input, ctx) {
       const d = door(ctx);
+      const client = typeof ctx?.client === 'string' && ctx.client ? ctx.client : null;
+      if (client && activeFor(client) >= maxActivePerClient) {
+        const handover = recordHandover({ reason: 'booking_limit', customer_name: input?.customer_name, contact: input?.contact,
+          summary: `This caller already holds ${maxActivePerClient} bookings; a person checks before another time is held.` }, ctx);
+        return { ...refuse('booking_limit', `You already hold ${maxActivePerClient} bookings, the most one caller can hold `
+          + 'at once. A person from the team will reply about another time; tell the customer that.'), handover };
+      }
       const missing = ['customer_name', 'contact', 'slot'].filter((k) => !cap(input?.[k], 10_000));
       if (missing.length) return refuse('incomplete', `Missing: ${missing.join(', ')}.`);
 
@@ -212,6 +231,10 @@ export function createDesk({ store, now = () => new Date() }) {
         transcript: cap(input.transcript, 20_000),
       };
       store.add('bookings', booking);
+      if (client) {
+        byClient.set(client, [...(byClient.get(client) ?? []), booking.reference]);
+        if (byClient.size > 10_000) byClient.delete(byClient.keys().next().value);
+      }
       return { ok: true, demo: true, booking };
     },
 

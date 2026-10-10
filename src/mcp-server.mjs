@@ -24,7 +24,7 @@ const asResult = (value, isError = false) => ({
   ...(isError ? { isError: true } : {}),
 });
 
-export function createMcpServer(desk) {
+export function createMcpServer(desk, ctx = AGENT) {
   const server = new McpServer({ name: 'widem-agent-desk', version: '0.1.0' });
   for (const tool of toolsFor('agent')) {
     server.registerTool(tool.name, {
@@ -32,7 +32,7 @@ export function createMcpServer(desk) {
       description: tool.description,
       inputSchema: toZodShape(tool.params, z),
     }, async (args) => {
-      const result = tool.run(desk, args ?? {}, AGENT);
+      const result = tool.run(desk, args ?? {}, ctx);
       return asResult(result, result?.ok === false);
     });
   }
@@ -84,6 +84,22 @@ export const CHAT_LIMITS = {
   maxSessions: 500, // past this the least recently used session is dropped
   maxHistoryMessages: 40, // per session; the oldest turns are trimmed (the system prompt is added fresh each turn)
 };
+/** Limits on the agent door. It spends no model credit, so these protect the calendar and the server: a whole
+ * agent booking is about 7 requests (initialize, tools/list, list_services, quote, check_availability, book, pay). */
+export const MCP_LIMITS = {
+  perIp: { requests: 60, windowMs: 10 * 60_000 }, // about 8 full bookings' worth from one caller
+  global: { requests: 300, windowMs: 60_000 }, // everyone together
+  newSessionsPerIp: { count: 10, windowMs: 10 * 60_000 }, // initialize requests: an agent connects once per conversation
+};
+
+/** The caller's IP. Cloudflare's CF-Connecting-IP is trusted only when TRUST_PROXY=cloudflare (the server then listens on
+ * 127.0.0.1 behind the tunnel); otherwise anyone could send the header and pick a fresh limit bucket per request. */
+export function clientIp(req, trustProxy) {
+  const header = req.headers['cf-connecting-ip'];
+  if (trustProxy === 'cloudflare' && typeof header === 'string' && header.trim() && header.length <= 64) return header.trim();
+  return req.socket.remoteAddress ?? 'unknown';
+}
+
 const MAX_MESSAGE_CHARS = 4000;
 const BUSY_REPLY = 'Too many messages for now. Please try again in a few minutes.\n'
   + 'عدد الرسائل كبير الآن. يرجى المحاولة مرة أخرى بعد بضع دقائق.';
@@ -120,7 +136,7 @@ function trimHistory(history, max) {
 /** The human door over HTTP: POST /chat { sessionId?, message } -> { sessionId, reply, booked?, handover? }.
  * The server issues session ids (send none to start); an id it did not issue gets a 400, never another
  * session's history. History lives in memory and is lost on restart. */
-function createChatRoute(desk, model, limits, now, lang = 'ar') {
+function createChatRoute(desk, model, limits, now, lang = 'ar', ipOf = (req) => clientIp(req)) {
   const chat = model ? createChat({ desk, model, lang }) : null;
   const sessions = new Map();
   const uiStates = new Map(); // per session: what the widgets have shown so far (a quote, free slots)
@@ -131,7 +147,7 @@ function createChatRoute(desk, model, limits, now, lang = 'ar') {
    * the client), then the desk confirms with the reference, slot and amount. Simulated: no card details, no charge. */
   function pay({ sessionId }, req, res, fail) {
     if (typeof sessionId !== 'string' || !sessions.has(sessionId)) { fail(400, 'Send the sessionId of this chat.', 'unknown_session'); return; }
-    const wait = perIp.take(req.socket.remoteAddress ?? 'unknown');
+    const wait = perIp.take(ipOf(req));
     if (wait) { res.setHeader('retry-after', String(wait)); send(res, 429, { error: { code: 'rate_limited' }, reply: busyReply(lang) }); return; }
     const state = uiStates.get(sessionId) ?? newWidgetState();
     if (!state.awaitingPayment) { fail(409, 'Nothing is waiting for payment in this chat.', 'nothing_to_pay'); return; }
@@ -169,7 +185,7 @@ function createChatRoute(desk, model, limits, now, lang = 'ar') {
       return;
     }
     if (!chat) { send(res, 503, { error: { code: 'chat_not_configured' }, reply: sorryReply(message, lang) }); return; }
-    const ip = req.socket.remoteAddress ?? 'unknown';
+    const ip = ipOf(req);
     const wait = perIp.take(ip) || (sessionId === undefined && newSessions.take(ip)) || global.take('all');
     if (wait) {
       res.setHeader('retry-after', String(wait));
@@ -208,8 +224,17 @@ function createChatRoute(desk, model, limits, now, lang = 'ar') {
 /** Both doors over one desk: the agent door at /mcp and, when a model is given, the human door at /chat.
  * Without a desk it runs on a memory store (nothing is kept). */
 export function createHttpServer({ desk = createDesk({ store: createMemoryStore() }), model, limits = CHAT_LIMITS,
-  now = Date.now, lang = 'ar' } = {}) {
-  const chatRoute = createChatRoute(desk, model, limits, now, lang);
+  now = Date.now, lang = 'ar', mcpLimits = MCP_LIMITS, trustProxy = 'none' } = {}) {
+  const ipOf = (req) => clientIp(req, trustProxy);
+  const chatRoute = createChatRoute(desk, model, limits, now, lang, ipOf);
+  const mcpPerIp = createBuckets(mcpLimits.perIp.requests, mcpLimits.perIp.windowMs, now);
+  const mcpGlobal = createBuckets(mcpLimits.global.requests, mcpLimits.global.windowMs, now);
+  const mcpNewSessions = createBuckets(mcpLimits.newSessionsPerIp.count, mcpLimits.newSessionsPerIp.windowMs, now);
+  const tooMany = (res, wait) => {
+    res.setHeader('retry-after', String(wait));
+    res.writeHead(429, { 'content-type': 'application/json' }).end(JSON.stringify({ jsonrpc: '2.0',
+      error: { code: -32000, message: `Too many requests. Try again in ${wait} seconds.` }, id: null }));
+  };
   return http.createServer(async (req, res) => {
     const path = new URL(req.url, 'http://x').pathname;
     if (path === '/' && (req.method === 'GET' || req.method === 'HEAD')) { // the chat page for people (read per request: a prototype)
@@ -225,13 +250,19 @@ export function createHttpServer({ desk = createDesk({ store: createMemoryStore(
       return;
     }
     if (path !== '/mcp') { res.writeHead(404).end(); return; }
+    const ip = ipOf(req);
+    const wait = mcpPerIp.take(ip) || mcpGlobal.take('all');
+    if (wait) { tooMany(res, wait); return; }
     try {
       const body = await readJson(req, (status, message) => sendJson(res, status, message));
       if (body.done) return;
       const parsed = body.value;
+      const starts = [parsed].flat().some((m) => m?.method === 'initialize');
+      const waitNew = starts ? mcpNewSessions.take(ip) : 0;
+      if (waitNew) { tooMany(res, waitNew); return; }
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
       res.on('close', () => transport.close());
-      await createMcpServer(desk).connect(transport);
+      await createMcpServer(desk, { door: 'agent', client: ip }).connect(transport);
       await transport.handleRequest(req, res, parsed);
     } catch (err) {
       console.error('mcp request failed:', err);
@@ -249,6 +280,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const model = process.env.NEBIUS_API_KEY && process.env.NEBIUS_BASE_URL ? createNebiusModel() : undefined;
   console.log(model ? 'Human door (chat) uses the model on Nebius Token Factory' : 'Human door (chat) is off: NEBIUS_API_KEY or NEBIUS_BASE_URL is not set');
   const lang = langFromEnv();
+  const trustProxy = process.env.TRUST_PROXY === 'cloudflare' ? 'cloudflare' : 'none';
+  console.log(`Client IP: ${trustProxy === 'cloudflare' ? 'CF-Connecting-IP (TRUST_PROXY=cloudflare; listen on 127.0.0.1 only)' : 'the socket address (TRUST_PROXY unset)'}`);
   console.log(`Desk language: ${lang} (DESK_LANG=ar for the bilingual desk)`);
-  createHttpServer({ desk, model, lang }).listen(port, host, () => console.log(`Agent door (MCP) on http://${host}:${port}/mcp, chat page on http://${host}:${port}/`));
+  createHttpServer({ desk, model, lang, trustProxy }).listen(port, host, () => console.log(`Agent door (MCP) on http://${host}:${port}/mcp, chat page on http://${host}:${port}/`));
 }

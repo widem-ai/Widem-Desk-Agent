@@ -44,6 +44,8 @@ node --env-file=.env src/mcp-server.mjs   # both doors: /mcp, and the chat at /c
 
 `PORT` and `HOST` change where it listens. Bookings and handovers are kept in `var/desk-store.json` (not committed); `DESK_STORE` points it at another file. The chat door (`POST /chat` with JSON `{ "message": "..." }`; the first reply carries a `sessionId` issued by the server, which later messages send back; answers `{ sessionId, reply, booked?, handover? }`; per-IP and global limits answer 429, set in `CHAT_LIMITS` in `src/mcp-server.mjs`) needs a Nebius Token Factory key: copy `.env.example` to `.env` and set `NEBIUS_API_KEY` and `NEBIUS_BASE_URL`. Without them the server still runs and `/chat` answers 503. Every SAR amount and time in a chat reply is checked against what the desk tools returned; a reply that states one they did not is re-asked once, then handed to a person. `node --env-file=.env smoke/chat-live-http.mjs` runs one Arabic conversation through the real model on a memory store.
 
+Abuse limits, before anything is public: the agent door has its own limits (`MCP_LIMITS` in `src/mcp-server.mjs`: per IP, global, and new connections per IP; over them it answers 429), and one caller holds at most 3 bookings at once (`MAX_ACTIVE_BOOKINGS_PER_CLIENT` in `src/desk.mjs`; the next one is refused and handed to a person). Unpaid bookings free their slot after 30 minutes. Behind the Cloudflare tunnel set `TRUST_PROXY=cloudflare` and keep `HOST=127.0.0.1`, so the client IP comes from `CF-Connecting-IP`; without the setting that header is ignored.
+
 To try the agent door by hand, run `npx @modelcontextprotocol/inspector`, choose Streamable HTTP and connect to `http://127.0.0.1:8790/mcp`.
 
 ## Layout
