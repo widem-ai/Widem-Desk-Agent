@@ -1,4 +1,4 @@
-// npm run check: every gate in one command (spec A-last).
+// npm run check: every gate in one command (spec A-last). Add -- --live for the adversarial set on the real model (costs credit).
 //   npm run check            the gates: tests, secret scan (tree + history), README tools, ARCHITECTURE warning
 //   npm run check -- --plant also plants one break per guard, asserts its gate goes red, and restores the file
 // It never leaves the tree dirty: --plant refuses to start on a dirty tree, keeps every original in memory,
@@ -190,6 +190,18 @@ async function main() {
   const s = secretsGate(); report(s.ok, s.line);
   const r = await readmeGate(); report(r.ok, r.line);
   const warn = architectureWarning(); if (warn) console.log(`WARN  ${warn}`);
+  // The live set's checkers, tested on hand-written replies (no model, no credit).
+  const self = sh(process.execPath, ['scripts/live-adversarial.mjs', '--self-test']);
+  report(self.status === 0, `live-set checkers: ${self.stdout.trim().split('\n').at(-1)}`);
+  if (process.argv.includes('--live')) { // spends Token Factory credit: only on request
+    if (!existsSync(join(ROOT, '.env'))) console.log('WARN  live: skipped, no .env with the Token Factory key');
+    else {
+      const live = sh(process.execPath, ['--env-file=.env', 'scripts/live-adversarial.mjs', '--runs', '2']);
+      const lines = live.stdout.trim().split('\n');
+      for (const l of lines.filter((x) => /^(FAIL #|  prompt|  reply|tokens:)/.test(x))) console.log(`      ${l}`);
+      report(live.status === 0, lines.at(-1));
+    }
+  }
 
   if (PLANT) {
     console.log('\nPlanted breaks (each must turn its gate red; every file is restored after its run):');
