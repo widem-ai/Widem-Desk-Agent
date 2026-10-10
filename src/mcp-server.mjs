@@ -195,7 +195,7 @@ function createChatRoute(desk, model, limits, now, lang = 'ar', ipOf = (req) => 
     const id = sessionId ?? randomUUID();
     let out;
     try {
-      out = await chat.respond(sessions.get(id) ?? [], message);
+      out = await chat.respond(sessions.get(id) ?? [], message, { client: ip });
     } catch (err) {
       const code = err?.code === 'model_timeout' ? 'model_timeout' : 'model_error';
       console.error('chat turn failed:', code, err?.message);
@@ -257,6 +257,13 @@ export function createHttpServer({ desk = createDesk({ store: createMemoryStore(
       const body = await readJson(req, (status, message) => sendJson(res, status, message));
       if (body.done) return;
       const parsed = body.value;
+      // One message per request, so each request is one token. MCP 2025-06-18 dropped JSON-RPC batching and our
+      // clients never batch; the SDK would still run a batch, which would carry many calls past the limits above.
+      if (Array.isArray(parsed) && parsed.length > 1) {
+        res.writeHead(400, { 'content-type': 'application/json' }).end(JSON.stringify({ jsonrpc: '2.0',
+          error: { code: -32600, message: 'Invalid Request: send one JSON-RPC message per request, not a batch.' }, id: null }));
+        return;
+      }
       const starts = [parsed].flat().some((m) => m?.method === 'initialize');
       const waitNew = starts ? mcpNewSessions.take(ip) : 0;
       if (waitNew) { tooMany(res, waitNew); return; }

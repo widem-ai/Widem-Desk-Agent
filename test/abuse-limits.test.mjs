@@ -104,3 +104,43 @@ test('the cap counts only bookings still holding a slot: an expired hold frees i
   t += 31 * 60_000; // the 30-minute holds run out unpaid
   assert.equal(book(SLOTS[4], 'a').ok, true);
 });
+
+// E3b: a JSON-RPC batch must not carry many calls past the per-request limits. The protocol revision 2025-06-18
+// dropped batching and our clients never batch, so a batch of more than one message is refused outright.
+test('/mcp: a 20-message batch from one IP cannot get past a per-IP limit of 5: it is refused with 400', async () => {
+  const door = await open({ mcpLimits: limits({ perIp: { requests: 5, windowMs: 60_000 } }) });
+  try {
+    const batch = Array.from({ length: 20 }, (_, i) => ({ jsonrpc: '2.0', id: i + 1, method: 'tools/call',
+      params: { name: 'book', arguments: { ...ORDER, slot: SLOTS[i % SLOTS.length], customer_name: 'Batch', contact: 'b@example.com' } } }));
+    const res = await post(door.url, batch);
+    assert.equal(res.status, 400);
+    assert.equal((await res.json()).error.code, -32600);
+    assert.equal(door.store.all('bookings').length, 0);
+  } finally { await door.close(); }
+});
+
+// E3b: the same 3-bookings cap per caller on the human door. The scripted model books once per turn, on a new slot.
+function bookingModel() {
+  let n = 0;
+  return { async complete({ messages }) {
+    const message = messages.some((m) => m.role === 'tool') ? { role: 'assistant', content: 'Done.' }
+      : { role: 'assistant', content: null, tool_calls: [{ id: `b${n}`, type: 'function', function: { name: 'book',
+        arguments: JSON.stringify({ ...ORDER, slot: SLOTS[n++ % SLOTS.length], customer_name: 'Chat', contact: 'c@example.com' }) } }] };
+    return { message, modelId: 'fake/scripted' };
+  } };
+}
+
+test('chat door: one IP holds at most 3 bookings; the 4th chat is refused and handed to a person', async () => {
+  const store = createMemoryStore();
+  const desk = createDesk({ store, now: () => new Date(NOW) });
+  const server = createHttpServer({ desk, model: bookingModel(), lang: 'en' });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const chat = (message) => fetch(`http://127.0.0.1:${server.address().port}/chat`, { method: 'POST',
+    headers: { 'content-type': 'application/json' }, body: JSON.stringify({ message }) });
+  try {
+    for (let i = 0; i < 4; i += 1) assert.equal((await chat(`Book me, turn ${i + 1}`)).status, 200);
+    assert.equal(store.all('bookings').length, 3);
+    assert.ok(store.all('bookings').every((b) => b.door === 'human'));
+    assert.equal(store.all('handovers').at(-1)?.reason_given, 'booking_limit');
+  } finally { await new Promise((resolve) => server.close(resolve)); }
+});

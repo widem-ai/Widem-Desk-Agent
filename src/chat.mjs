@@ -234,7 +234,7 @@ export function withConfirmation(reply, booking, arabic) {
 
 const failure = (code, message) => ({ ok: false, demo: true, error: { code, message } });
 
-function runTool(desk, call, messages) {
+function runTool(desk, call, messages, ctx = HUMAN) {
   const tool = TOOLS.find((t) => t.name === call.function?.name);
   if (!tool) return failure('unknown_tool', `There is no tool called ${call.function?.name}.`);
   let args;
@@ -247,7 +247,7 @@ function runTool(desk, call, messages) {
   if (problem) return failure('bad_arguments', problem);
   // The transcript is added after the check, so the model can never write it.
   const input = KEEPS_TRANSCRIPT.has(tool.name) ? { ...args, transcript: transcriptOf(messages) } : args;
-  return tool.run(desk, input, HUMAN);
+  return tool.run(desk, input, ctx);
 }
 
 /**
@@ -259,7 +259,8 @@ export function createChat({ desk, model, maxRounds = 6, lang = 'ar' }) {
   const arabic = (t) => lang === 'ar' && ARABIC.test(t ?? ''); // English replies on the English desk
   if (!desk || !model) throw new Error('createChat needs a desk and a model');
   return {
-    async respond(history, text) {
+    async respond(history, text, { client } = {}) {
+      const ctx = client ? { ...HUMAN, client } : HUMAN; // client: the caller's IP, for the desk's per-caller booking cap
       const messages = [{ role: 'system', content: promptFor(lang) }, ...history, { role: 'user', content: text }];
       const toolCalls = [];
       let modelId;
@@ -309,7 +310,7 @@ export function createChat({ desk, model, maxRounds = 6, lang = 'ar' }) {
       if (rec) {
         const args = quoteArgsFor(rec);
         const deskCall = { id: `${REC_CALL_PREFIX}_1`, type: 'function', function: { name: 'quote', arguments: JSON.stringify(args) } };
-        const result = runTool(desk, deskCall, messages);
+        const result = runTool(desk, deskCall, messages, ctx);
         if (result.ok) {
           messages.push({ role: 'assistant', content: null, tool_calls: [deskCall] }, { role: 'tool', tool_call_id: deskCall.id, content: JSON.stringify(result) });
           toolCalls.push({ name: 'recommend', arguments: deskCall.function.arguments, result: { ok: true, ...rec, quote: result } });
@@ -392,7 +393,7 @@ export function createChat({ desk, model, maxRounds = 6, lang = 'ar' }) {
           continue;
         }
         for (const call of message.tool_calls) {
-          const result = runTool(desk, call, messages);
+          const result = runTool(desk, call, messages, ctx);
           toolCalls.push({ name: call.function?.name, arguments: call.function?.arguments, result });
           messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(result) });
         }
