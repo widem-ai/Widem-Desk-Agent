@@ -39,6 +39,7 @@ Needs Node.js 22 or newer.
 npm install
 npm test        # unit tests for the core, plus a real MCP client over HTTP
 npm run check   # every gate: tests, secret scan (tree + git history), README tools; add -- --plant to break each guard on purpose
+npm run check -- --plant   # release checklist: run this before every push
 npm start       # agent door on http://127.0.0.1:8790/mcp
 node --env-file=.env src/mcp-server.mjs   # both doors: /mcp, and the chat at /chat
 ```
