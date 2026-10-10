@@ -148,6 +148,11 @@ export function createDesk({ store, now = () => new Date(), maxActivePerClient =
   }
 
   return {
+    /** For the owner page only: copies of every booking and handover. Never exposed as a tool. */
+    ownerView() {
+      return { bookings: store.all('bookings').map((b) => ({ ...b })), handovers: store.all('handovers').map((h) => ({ ...h })) };
+    },
+
     /** Free slots. input: { from?: 'YYYY-MM-DD' in the business timezone (default today), days?: 1..7 (default 7) }. */
     checkAvailability(input) {
       const current = nowMs();

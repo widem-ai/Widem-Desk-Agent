@@ -11,7 +11,7 @@ Both doors call the same core, so a person and an agent asking for the same thin
 
 ## Status
 
-Built so far: the core (prices, free slots, bookings and handover to a person), the agent door (MCP, six tools), the chat endpoint for people (POST /chat, Nemotron calling the same tools) and the chat page at `/` (English). The owner page and public hosting come next.
+Built so far: the core (prices, free slots, bookings and handover to a person), the agent door (MCP, six tools), the chat endpoint for people (POST /chat, Nemotron calling the same tools) and the chat page at `/` (English). The owner page is built (slice 1: read only). Public hosting comes next.
 
 The tools are defined once in `src/tools.mjs`. Five are shared by both doors; `pay` is on the agent door only (people pay with the button on the chat page), and `ask_choice` is on the chat door only (it shows answer buttons to a person).
 
@@ -51,6 +51,8 @@ Abuse limits, before anything is public. All limits count per address (one IP), 
 - Bookings, on both doors: one address holds at most 3 bookings at once, held or paid (`MAX_ACTIVE_BOOKINGS_PER_CLIENT` in `src/desk.mjs`). The next one is refused and handed to a person, who replies about another time.
 
 Unpaid bookings free their slot after 30 minutes. Behind the Cloudflare tunnel set `TRUST_PROXY=cloudflare` and keep `HOST=127.0.0.1`, so the client IP comes from `CF-Connecting-IP`; without the setting that header is ignored.
+
+The owner page is at `/owner`: every booking from both doors (door, customer, contact, service, tier, price, slot, paid or held) and every handover with its reason, newest first, each with its conversation. It is off (404) unless `OWNER_TOKEN` is set on the server. Sign in with the token in the form, or send it as `Authorization: Bearer <token>`; a token in the URL is ignored, because URLs end up in logs. Five wrong tokens from one address in 15 minutes lock that address out until the first of them is 15 minutes old (`OWNER_LIMITS` in `src/owner.mjs`). The page is never cached, indexed or framed, and all customer text on it is escaped.
 
 To try the agent door by hand, run `npx @modelcontextprotocol/inspector`, choose Streamable HTTP and connect to `http://127.0.0.1:8790/mcp`.
 

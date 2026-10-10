@@ -13,6 +13,7 @@ import { createChat, createNebiusModel, sorryReply, langFromEnv } from './chat.m
 import { widgetsFor, trimSlotLines, pickSlotLine, newWidgetState, trimRecReply } from './widgets.mjs';
 import { createFileStore, createMemoryStore } from './store.mjs';
 import { slotLabels } from './labels.mjs';
+import { createOwnerRoute, OWNER_LIMITS } from './owner.mjs';
 
 const AVAILABILITY = JSON.parse(readFileSync(new URL('../data/demo-business.json', import.meta.url), 'utf8')).availability;
 
@@ -224,8 +225,10 @@ function createChatRoute(desk, model, limits, now, lang = 'ar', ipOf = (req) => 
 /** Both doors over one desk: the agent door at /mcp and, when a model is given, the human door at /chat.
  * Without a desk it runs on a memory store (nothing is kept). */
 export function createHttpServer({ desk = createDesk({ store: createMemoryStore() }), model, limits = CHAT_LIMITS,
-  now = Date.now, lang = 'ar', mcpLimits = MCP_LIMITS, trustProxy = 'none' } = {}) {
+  now = Date.now, lang = 'ar', mcpLimits = MCP_LIMITS, trustProxy = 'none',
+  ownerToken, ownerLimits = OWNER_LIMITS } = {}) {
   const ipOf = (req) => clientIp(req, trustProxy);
+  const ownerRoute = createOwnerRoute({ desk, token: ownerToken, limits: ownerLimits, now, ipOf });
   const chatRoute = createChatRoute(desk, model, limits, now, lang, ipOf);
   const mcpPerIp = createBuckets(mcpLimits.perIp.requests, mcpLimits.perIp.windowMs, now);
   const mcpGlobal = createBuckets(mcpLimits.global.requests, mcpLimits.global.windowMs, now);
@@ -246,6 +249,13 @@ export function createHttpServer({ desk = createDesk({ store: createMemoryStore(
       try { await chatRoute(req, res); } catch (err) {
         console.error('chat request failed:', err);
         if (!res.headersSent) send(res, 500, { error: { code: 'internal_error' } });
+      }
+      return;
+    }
+    if (path === '/owner') {
+      try { await ownerRoute(req, res); } catch {
+        console.error('owner page request failed'); // no detail: the error could carry customer text
+        if (!res.headersSent) res.writeHead(500).end();
       }
       return;
     }
@@ -288,7 +298,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   console.log(model ? 'Human door (chat) uses the model on Nebius Token Factory' : 'Human door (chat) is off: NEBIUS_API_KEY or NEBIUS_BASE_URL is not set');
   const lang = langFromEnv();
   const trustProxy = process.env.TRUST_PROXY === 'cloudflare' ? 'cloudflare' : 'none';
+  const ownerToken = process.env.OWNER_TOKEN || undefined;
+  console.log(`Owner page: ${ownerToken ? 'on at /owner (OWNER_TOKEN set)' : 'off (OWNER_TOKEN not set)'}`);
   console.log(`Client IP: ${trustProxy === 'cloudflare' ? 'CF-Connecting-IP (TRUST_PROXY=cloudflare; listen on 127.0.0.1 only)' : 'the socket address (TRUST_PROXY unset)'}`);
   console.log(`Desk language: ${lang} (DESK_LANG=ar for the bilingual desk)`);
-  createHttpServer({ desk, model, lang, trustProxy }).listen(port, host, () => console.log(`Agent door (MCP) on http://${host}:${port}/mcp, chat page on http://${host}:${port}/`));
+  createHttpServer({ desk, model, lang, trustProxy, ownerToken }).listen(port, host, () => console.log(`Agent door (MCP) on http://${host}:${port}/mcp, chat page on http://${host}:${port}/`));
 }
