@@ -8,6 +8,7 @@ import { toWestern, ungrounded, paymentClaims, statedAmounts } from './guard.mjs
 import { slotLabels } from './labels.mjs';
 import { latinWords, arabicWords } from './latin.mjs';
 import { pendingRecommendation, quoteArgsFor, REC_CALL_PREFIX, namesService } from './recommend.mjs';
+import { STORE_FULL } from './desk.mjs';
 
 const HUMAN = { door: 'human' };
 const DATA = JSON.parse(readFileSync(new URL('../data/demo-business.json', import.meta.url), 'utf8'));
@@ -19,6 +20,7 @@ const ACK_KEY = { unknown_tier: 'unknown_service', unknown_addon: 'unknown_servi
 /** What the customer is told on a handover (Mohannad, 2026-10-05, choice 2 = a): one acknowledgement line chosen in
  * code from the reason, then the fixed line. Never the model's text. */
 export function handoverReply(reason, arabic) {
+  if (reason === 'store_full') return arabic ? STORE_FULL.ar : STORE_FULL.en; // nothing was kept, so no person will reply
   const ack = HO.acknowledge[ACK_KEY[reason] ?? reason] ?? HO.acknowledge.out_of_rules;
   return arabic ? `${ack.ar} ${HO.tell_customer_ar}` : `${ack.en} ${HO.tell_customer_en}`;
 }

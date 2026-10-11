@@ -10,16 +10,29 @@ const KINDS = ['bookings', 'handovers'];
 const copy = (o) => JSON.parse(JSON.stringify(o));
 const empty = () => ({ bookings: [], handovers: [] });
 
+// The most records (bookings + handovers together) a store takes. Past it add() throws code store_full; records
+// already stored are never deleted, and update() still works. DESK_MAX_RECORDS overrides it on the server.
+export const DEFAULT_MAX_RECORDS = 1000;
+
+function storeFull(maxRecords) {
+  return Object.assign(new Error(`store: full (${maxRecords} records)`), { code: 'store_full' });
+}
+const total = (state) => KINDS.reduce((n, k) => n + state[k].length, 0);
+
 function checkKind(kind) {
   if (!KINDS.includes(kind)) throw new Error(`store: unknown kind "${kind}"`);
 }
 
 /** In-memory store: for tests and throwaway runs. Gone when the process ends. */
-export function createMemoryStore() {
+export function createMemoryStore({ maxRecords = DEFAULT_MAX_RECORDS } = {}) {
   const state = empty();
   return {
     all(kind) { checkKind(kind); return copy(state[kind]); },
-    add(kind, record) { checkKind(kind); state[kind].push(copy(record)); },
+    add(kind, record) {
+      checkKind(kind);
+      if (total(state) >= maxRecords) throw storeFull(maxRecords);
+      state[kind].push(copy(record));
+    },
     update(kind, key, value, changes) {
       checkKind(kind);
       const i = state[kind].findIndex((r) => r[key] === value);
@@ -31,7 +44,7 @@ export function createMemoryStore() {
 }
 
 /** File store: one JSON file, rewritten whole on every add (write to a temp file, then rename). */
-export function createFileStore(file) {
+export function createFileStore(file, { maxRecords = DEFAULT_MAX_RECORDS } = {}) {
   let state = empty();
   if (existsSync(file)) {
     try {
@@ -47,6 +60,7 @@ export function createFileStore(file) {
     all(kind) { checkKind(kind); return copy(state[kind]); },
     add(kind, record) {
       checkKind(kind);
+      if (total(state) >= maxRecords) throw storeFull(maxRecords);
       const next = { ...state, [kind]: [...state[kind], copy(record)] };
       mkdirSync(dirname(file), { recursive: true });
       const tmp = `${file}.tmp`;

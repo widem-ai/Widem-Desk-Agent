@@ -14,6 +14,13 @@ const SLOT_MS = AV.slot_minutes * 60_000;
 // A slot must carry its offset (Z or +03:00); "11:00" alone would be read in the server's own timezone.
 const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/;
 
+/** What the customer is told when the store is full (src/store.mjs): no new booking or handover can be kept. */
+export const STORE_FULL = {
+  en: 'Sorry, the desk cannot take more requests right now. Please try again later.',
+  ar: 'عذرًا، لا يستطيع المكتب استقبال طلبات جديدة الآن. يرجى المحاولة لاحقًا.',
+};
+const isFull = (err) => err?.code === 'store_full';
+
 function refuse(code, message) {
   return { ok: false, demo: true, error: { code, message } };
 }
@@ -122,7 +129,12 @@ export function createDesk({ store, now = () => new Date(), maxActivePerClient =
       status: 'open',
       ...extra,
     };
-    store.add('handovers', record);
+    try {
+      store.add('handovers', record);
+    } catch (err) {
+      if (!isFull(err)) throw err;
+      return { id: null, reason: 'store_full', tell_customer_en: STORE_FULL.en, tell_customer_ar: STORE_FULL.ar };
+    }
     return { id: record.id, reason, tell_customer_en: HO.tell_customer_en, tell_customer_ar: HO.tell_customer_ar };
   }
 
@@ -235,7 +247,12 @@ export function createDesk({ store, now = () => new Date(), maxActivePerClient =
         hold_until: new Date(current + PAY.hold_minutes * 60_000).toISOString(),
         transcript: cap(input.transcript, 20_000),
       };
-      store.add('bookings', booking);
+      try {
+        store.add('bookings', booking);
+      } catch (err) {
+        if (!isFull(err)) throw err;
+        return refuse('store_full', `The desk cannot take more bookings right now. Tell the customer: ${STORE_FULL.en}`);
+      }
       if (client) {
         byClient.set(client, [...(byClient.get(client) ?? []), booking.reference]);
         if (byClient.size > 10_000) byClient.delete(byClient.keys().next().value);

@@ -2,6 +2,7 @@
 // Each tool calls the core and nothing else, so an agent gets exactly what a person would.
 import http from 'node:http';
 import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -11,7 +12,8 @@ import { createDesk } from './desk.mjs';
 import { toolsFor, toZodShape } from './tools.mjs';
 import { createChat, createNebiusModel, sorryReply, langFromEnv } from './chat.mjs';
 import { widgetsFor, trimSlotLines, pickSlotLine, newWidgetState, trimRecReply } from './widgets.mjs';
-import { createFileStore, createMemoryStore } from './store.mjs';
+import { createFileStore, createMemoryStore, DEFAULT_MAX_RECORDS } from './store.mjs';
+import { limitModelCalls, RESTING, DEFAULT_MODEL_CALLS_PER_DAY } from './model-budget.mjs';
 import { slotLabels } from './labels.mjs';
 import { createOwnerRoute, OWNER_LIMITS, MIN_TOKEN_LENGTH } from './owner.mjs';
 
@@ -139,6 +141,10 @@ function trimHistory(history, max) {
  * session's history. History lives in memory and is lost on restart. */
 function createChatRoute(desk, model, limits, now, lang = 'ar', ipOf = (req) => clientIp(req)) {
   const chat = model ? createChat({ desk, model, lang }) : null;
+  const resting = (res) => {
+    res.setHeader('retry-after', String(model.secondsLeft?.() ?? 3600));
+    send(res, 503, { error: { code: 'daily_limit' }, reply: lang === 'ar' ? RESTING.ar : RESTING.en });
+  };
   const sessions = new Map();
   const uiStates = new Map(); // per session: what the widgets have shown so far (a quote, free slots)
   const perIp = createBuckets(limits.perIp.messages, limits.perIp.windowMs, now);
@@ -193,11 +199,13 @@ function createChatRoute(desk, model, limits, now, lang = 'ar', ipOf = (req) => 
       send(res, 429, { error: { code: 'rate_limited' }, reply: busyReply(lang) });
       return;
     }
+    if (model.exhausted?.()) { resting(res); return; } // the day's model calls are spent (src/model-budget.mjs)
     const id = sessionId ?? randomUUID();
     let out;
     try {
       out = await chat.respond(sessions.get(id) ?? [], message, { client: ip });
     } catch (err) {
+      if (err?.code === 'daily_limit') { resting(res); return; } // the cap was reached inside this turn
       const code = err?.code === 'model_timeout' ? 'model_timeout' : 'model_error';
       console.error('chat turn failed:', code, err?.message);
       send(res, 503, { error: { code }, reply: sorryReply(message, lang) }); // the failed turn is not kept
@@ -221,6 +229,9 @@ function createChatRoute(desk, model, limits, now, lang = 'ar', ipOf = (req) => 
       ...(booked ? { booked } : {}), ...(handover ? { handover } : {}), activity: activityOf(out.toolCalls), ui });
   };
 }
+
+/** A whole number above 0 from an env var, else the fallback (a typo must not turn a cap off). */
+export const positiveInt = (v, fallback) => (/^d+$/.test(String(v ?? '').trim()) && Number(v) > 0 ? Number(v) : fallback);
 
 /** Both doors over one desk: the agent door at /mcp and, when a model is given, the human door at /chat.
  * Without a desk it runs on a memory store (nothing is kept). */
@@ -292,9 +303,14 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const port = Number(process.env.PORT ?? 8790);
   const host = process.env.HOST ?? '127.0.0.1';
   const storeFile = process.env.DESK_STORE ?? fileURLToPath(new URL('../var/desk-store.json', import.meta.url));
-  const desk = createDesk({ store: createFileStore(storeFile) });
+  const maxRecords = positiveInt(process.env.DESK_MAX_RECORDS, DEFAULT_MAX_RECORDS);
+  const desk = createDesk({ store: createFileStore(storeFile, { maxRecords }) });
   console.log(`Bookings and handovers are kept in ${storeFile}`);
-  const model = process.env.NEBIUS_API_KEY && process.env.NEBIUS_BASE_URL ? createNebiusModel() : undefined;
+  const perDay = positiveInt(process.env.DESK_MODEL_CALLS_PER_DAY, DEFAULT_MODEL_CALLS_PER_DAY);
+  const callsFile = process.env.DESK_MODEL_CALLS_FILE ?? join(dirname(storeFile), 'model-calls.json');
+  const model = process.env.NEBIUS_API_KEY && process.env.NEBIUS_BASE_URL
+    ? limitModelCalls(createNebiusModel(), { perDay, file: callsFile }) : undefined;
+  console.log(`Limits: ${maxRecords} stored records in total, ${perDay} model calls a Riyadh day`);
   console.log(model ? 'Human door (chat) uses the model on Nebius Token Factory' : 'Human door (chat) is off: NEBIUS_API_KEY or NEBIUS_BASE_URL is not set');
   const lang = langFromEnv();
   const trustProxy = process.env.TRUST_PROXY === 'cloudflare' ? 'cloudflare' : 'none';
