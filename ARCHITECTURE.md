@@ -40,19 +40,22 @@ Both doors call the same desk through the same tool definitions, so a person and
 |---|---|---|
 | Bookings and handovers (with transcripts, contacts, prices) | `var/desk-store.json` (`DESK_STORE` to move it), written atomically (temp file + rename) | Yes |
 | Chat sessions and their history (capped at 40 messages) | Memory | No: a customer starts a new chat |
+| Today's model-call count (Riyadh day) | `var/model-calls.json` next to the store (`DESK_MODEL_CALLS_FILE` to move it), written atomically | Yes: a restart does not refill the day |
 | Rate-limit buckets, the per-caller booking list, owner sign-in failures | Memory | No: a restart resets them (slots already taken stay taken) |
+
+**Caps.** The store takes at most `DESK_MAX_RECORDS` (default 1000) bookings and handovers in total: past it `add()` throws `store_full`, the desk refuses `book` and `handover` cleanly and the customer is told the desk cannot take more requests right now. Nothing stored is ever deleted to make room, and the owner page keeps reading. At about 22 KB for the largest handover, 1000 records keep the file that is rewritten on every write near 20 MB at worst.
 
 Unpaid bookings free their slot after `payment.hold_minutes` (30); expiry is checked when slots are read, the record stays.
 
 ## The model
 
-Nemotron 3 Super 120B (`nvidia/nemotron-3-super-120b-a12b`) on Nebius Token Factory, OpenAI-compatible chat completions with tool calling, temperature 0, 20-second timeout. Without `NEBIUS_API_KEY` and `NEBIUS_BASE_URL` the server still runs: the agent door works fully (it needs no model) and `/chat` answers 503. The agent door spends no model credit; the chat door's limits protect it.
+Nemotron 3 Super 120B (`nvidia/nemotron-3-super-120b-a12b`) on Nebius Token Factory, OpenAI-compatible chat completions with tool calling, temperature 0, 20-second timeout. Without `NEBIUS_API_KEY` and `NEBIUS_BASE_URL` the server still runs: the agent door works fully (it needs no model) and `/chat` answers 503. The agent door spends no model credit, so it keeps working when the chat door rests. The chat door's rate limits bound the speed; `DESK_MODEL_CALLS_PER_DAY` (default 150, `src/model-budget.mjs`) bounds the total: every call is counted before it is sent, and once the Riyadh day's calls are spent `/chat` answers the resting line (503 `daily_limit`) without calling the model, including a turn that reaches the cap halfway.
 
 ## What must never break
 
 1. **No invented price or time reaches a customer.** Prices and slots come only from tool results; the guard re-asks once, then hands over.
 2. **Both doors agree.** Same input, same quote, same booking fields (`test/two-doors.test.mjs`).
-3. **The limits and the cap hold.** `/mcp` and `/chat` rate limits, one message per MCP request (no batches), at most 3 bookings held per address on both doors.
+3. **The limits and the caps hold.** `/mcp` and `/chat` rate limits, the total record cap, the daily model-call cap, one message per MCP request (no batches), at most 3 bookings held per address on both doors.
 4. **No secrets in logs or in git.** No key, token, contact or customer text in any log line; `npm run check` scans the tree and all history.
 5. **The owner page is off without a strong token.** No `OWNER_TOKEN`, or one under 32 characters, means 404.
 
