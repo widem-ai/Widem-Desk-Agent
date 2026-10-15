@@ -13,7 +13,7 @@ The desk is live at **https://desk.n8nwidem.uk**.
 
 ## NVIDIA and Nebius
 
-- **Model:** NVIDIA Nemotron 3 Super 120B (`nvidia/nemotron-3-super-120b-a12b`, the default in `src/chat.mjs`), with tool calling, temperature 0. The server can name another Token Factory model with `DESK_MODEL` without a code change; the startup log prints the model in use.
+- **Model:** NVIDIA Nemotron 3 Super 120B (`nvidia/nemotron-3-super-120b-a12b`, the default in `src/chat.mjs`), with tool calling, temperature 0. The server can name another Token Factory model with `DESK_MODEL` without a code change; the startup log prints the model in use. NVIDIA's API catalog lists the default as deprecated on 2026-10-19. Tested through the desk's own chat path on 2026-10-16, one quote request each ("How much is a CV rewrite with 6 years of experience?"): `nvidia/Nemotron-3.5-Super-VL` and `nvidia/Nemotron-3_5-Lightning` both answered and both called `quote` before stating the price.
 - **Nebius Token Factory** serves that model through its OpenAI-compatible API. It runs only the human door's conversation: choosing which tool to call and wording the reply. Prices, tiers, slots and bookings come from the desk code, and a guard (`src/guard.mjs`) blocks any reply that states an amount or a time the tools did not return. The agent door needs no model at all.
 - **Other Nebius services:** none. The server runs on our own VPS behind a Cloudflare tunnel.
 
