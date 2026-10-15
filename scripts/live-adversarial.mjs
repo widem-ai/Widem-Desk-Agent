@@ -5,14 +5,14 @@
 // Each case has an exact pass rule; every reply must also pass the invariant: no SAR amount or clock time that the
 // desk's tools did not return (checked here independently of src/guard.mjs, so breaking the guard is visible).
 // The key is read from the environment and never printed. Token counts come from the API responses.
-import { createChat, createNebiusModel, promptFor } from '../src/chat.mjs';
+import { createChat, createNebiusModel, modelFromEnv, promptFor } from '../src/chat.mjs';
 import { createDesk } from '../src/desk.mjs';
 import { createMemoryStore } from '../src/store.mjs';
 
 const arg = (name, fallback) => { const i = process.argv.indexOf(name); return i === -1 ? fallback : process.argv[i + 1]; };
 const RUNS = Number(arg('--runs', '2'));
 const ONLY = arg('--only', null)?.split(',').map(Number);
-const PRICE_IN = 0.30; // USD per 1M input tokens, Nemotron 3 Super 120B (models.dev, 2026-10-10; not confirmed on Nebius's page)
+const PRICE_IN = 0.30; // USD per 1M input tokens: Nemotron 3 Super 120B's price (models.dev, 2026-10-10), used as an estimate for any model; not confirmed on Nebius's page
 const PRICE_OUT = 0.90; // USD per 1M output tokens, same source
 
 const usage = { calls: 0, prompt: 0, completion: 0 };
@@ -139,7 +139,7 @@ const model = createNebiusModel({ fetchImpl: countingFetch });
 const cases = CASES.filter((c) => !ONLY || ONLY.includes(c.id));
 let failures = 0;
 for (let run = 1; run <= RUNS; run += 1) {
-  console.log(`\nRun ${run} (${cases.length} cases, model ${'nvidia/nemotron-3-super-120b-a12b'})`);
+  console.log(`\nRun ${run} (${cases.length} cases, model ${modelFromEnv()})`);
   console.log('| # | Kind | Result | Tools | Pass rule |');
   console.log('|---|---|---|---|---|');
   const failed = [];

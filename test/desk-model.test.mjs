@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { createNebiusModel, modelFromEnv, DEFAULT_MODEL } from '../src/chat.mjs';
 
 test('modelFromEnv: unset or blank keeps the default model', () => {
-  assert.equal(DEFAULT_MODEL, 'nvidia/nemotron-3-super-120b-a12b');
+  assert.equal(DEFAULT_MODEL, 'nvidia/Nemotron-3.5-Super-VL');
   for (const env of [{}, { DESK_MODEL: '' }, { DESK_MODEL: '   ' }]) assert.equal(modelFromEnv(env), DEFAULT_MODEL);
 });
 
@@ -36,7 +36,8 @@ async function modelSentWith(deskModel) {
 }
 
 test('DESK_MODEL in the env is the model named in the request body', async () => {
-  assert.equal(await modelSentWith('nvidia/Nemotron-3.5-Super-VL'), 'nvidia/Nemotron-3.5-Super-VL');
+  // A model other than the default, so a DESK_MODEL that is ignored cannot pass by matching the default.
+  assert.equal(await modelSentWith('nvidia/Nemotron-3_5-Lightning'), 'nvidia/Nemotron-3_5-Lightning');
 });
 
 test('DESK_MODEL unset or blank: the request names the default model', async () => {

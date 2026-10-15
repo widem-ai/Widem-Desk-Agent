@@ -25,7 +25,7 @@ export function handoverReply(reason, arabic) {
   return arabic ? `${ack.ar} ${HO.tell_customer_ar}` : `${ack.en} ${HO.tell_customer_en}`;
 }
 const AV = DATA.availability;
-export const DEFAULT_MODEL = 'nvidia/nemotron-3-super-120b-a12b';
+export const DEFAULT_MODEL = 'nvidia/Nemotron-3.5-Super-VL';
 /** The model the human door calls: DESK_MODEL on the server, else DEFAULT_MODEL (unset or blank). */
 export const modelFromEnv = (env = process.env) => String(env.DESK_MODEL ?? '').trim() || DEFAULT_MODEL;
 const ARABIC = /[؀-ۿ]/;
