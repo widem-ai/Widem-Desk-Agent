@@ -130,6 +130,8 @@ const PLANTS = [
     "if (trustProxy === 'cloudflare' && typeof header", 'if (typeof header'],
   ['A7', 'DESK_MAX_RECORDS and DESK_MODEL_CALLS_PER_DAY ignored (env parse always falls back)', 'src/mcp-server.mjs',
     '(/^\\d+$/.test(', '(/^d+$/.test('],
+  ['A7', 'DESK_MODEL ignored: the request always names the default model', 'src/chat.mjs',
+    'model = modelFromEnv(), temperature', 'model = DEFAULT_MODEL, temperature'],
 ];
 
 const originals = new Map(); // file -> original text, restored in finally
