@@ -128,6 +128,8 @@ const PLANTS = [
     'message, { client: ip });', 'message, {});'],
   ['A7', 'CF-Connecting-IP trusted without TRUST_PROXY', 'src/mcp-server.mjs',
     "if (trustProxy === 'cloudflare' && typeof header", 'if (typeof header'],
+  ['A7', 'DESK_MAX_RECORDS and DESK_MODEL_CALLS_PER_DAY ignored (env parse always falls back)', 'src/mcp-server.mjs',
+    '(/^\\d+$/.test(', '(/^d+$/.test('],
 ];
 
 const originals = new Map(); // file -> original text, restored in finally

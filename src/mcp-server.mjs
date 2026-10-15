@@ -231,7 +231,14 @@ function createChatRoute(desk, model, limits, now, lang = 'ar', ipOf = (req) => 
 }
 
 /** A whole number above 0 from an env var, else the fallback (a typo must not turn a cap off). */
-export const positiveInt = (v, fallback) => (/^d+$/.test(String(v ?? '').trim()) && Number(v) > 0 ? Number(v) : fallback);
+export const positiveInt = (v, fallback) => (/^\d+$/.test(String(v ?? '').trim()) && Number(v) > 0 ? Number(v) : fallback);
+
+/** The two server caps from the environment: DESK_MAX_RECORDS (stored records in total) and
+ * DESK_MODEL_CALLS_PER_DAY (model calls a Riyadh day). Anything but a whole number above zero keeps the default. */
+export const limitsFromEnv = (env = process.env) => ({
+  maxRecords: positiveInt(env.DESK_MAX_RECORDS, DEFAULT_MAX_RECORDS),
+  perDay: positiveInt(env.DESK_MODEL_CALLS_PER_DAY, DEFAULT_MODEL_CALLS_PER_DAY),
+});
 
 /** Both doors over one desk: the agent door at /mcp and, when a model is given, the human door at /chat.
  * Without a desk it runs on a memory store (nothing is kept). */
@@ -303,10 +310,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const port = Number(process.env.PORT ?? 8790);
   const host = process.env.HOST ?? '127.0.0.1';
   const storeFile = process.env.DESK_STORE ?? fileURLToPath(new URL('../var/desk-store.json', import.meta.url));
-  const maxRecords = positiveInt(process.env.DESK_MAX_RECORDS, DEFAULT_MAX_RECORDS);
+  const { maxRecords, perDay } = limitsFromEnv();
   const desk = createDesk({ store: createFileStore(storeFile, { maxRecords }) });
   console.log(`Bookings and handovers are kept in ${storeFile}`);
-  const perDay = positiveInt(process.env.DESK_MODEL_CALLS_PER_DAY, DEFAULT_MODEL_CALLS_PER_DAY);
   const callsFile = process.env.DESK_MODEL_CALLS_FILE ?? join(dirname(storeFile), 'model-calls.json');
   const model = process.env.NEBIUS_API_KEY && process.env.NEBIUS_BASE_URL
     ? limitModelCalls(createNebiusModel(), { perDay, file: callsFile }) : undefined;
