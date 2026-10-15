@@ -49,7 +49,7 @@ Unpaid bookings free their slot after `payment.hold_minutes` (30); expiry is che
 
 ## The model
 
-Nemotron 3 Super 120B (`nvidia/nemotron-3-super-120b-a12b`) on Nebius Token Factory, OpenAI-compatible chat completions with tool calling, temperature 0, 20-second timeout. Without `NEBIUS_API_KEY` and `NEBIUS_BASE_URL` the server still runs: the agent door works fully (it needs no model) and `/chat` answers 503. The agent door spends no model credit, so it keeps working when the chat door rests. The chat door's rate limits bound the speed; `DESK_MODEL_CALLS_PER_DAY` (default 150, `src/model-budget.mjs`) bounds the total: every call is counted before it is sent, and once the Riyadh day's calls are spent `/chat` answers the resting line (503 `daily_limit`) without calling the model, including a turn that reaches the cap halfway.
+Nemotron 3 Super 120B (`nvidia/nemotron-3-super-120b-a12b`, the default; `DESK_MODEL` on the server names another model, shown in the startup log) on Nebius Token Factory, OpenAI-compatible chat completions with tool calling, temperature 0, 20-second timeout. Without `NEBIUS_API_KEY` and `NEBIUS_BASE_URL` the server still runs: the agent door works fully (it needs no model) and `/chat` answers 503. The agent door spends no model credit, so it keeps working when the chat door rests. The chat door's rate limits bound the speed; `DESK_MODEL_CALLS_PER_DAY` (default 150, `src/model-budget.mjs`) bounds the total: every call is counted before it is sent, and once the Riyadh day's calls are spent `/chat` answers the resting line (503 `daily_limit`) without calling the model, including a turn that reaches the cap halfway.
 
 ## What must never break
 

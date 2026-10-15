@@ -10,7 +10,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { z } from 'zod';
 import { createDesk } from './desk.mjs';
 import { toolsFor, toZodShape } from './tools.mjs';
-import { createChat, createNebiusModel, sorryReply, langFromEnv } from './chat.mjs';
+import { createChat, createNebiusModel, sorryReply, langFromEnv, modelFromEnv } from './chat.mjs';
 import { widgetsFor, trimSlotLines, pickSlotLine, newWidgetState, trimRecReply } from './widgets.mjs';
 import { createFileStore, createMemoryStore, DEFAULT_MAX_RECORDS } from './store.mjs';
 import { limitModelCalls, RESTING, DEFAULT_MODEL_CALLS_PER_DAY } from './model-budget.mjs';
@@ -313,11 +313,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const { maxRecords, perDay } = limitsFromEnv();
   const desk = createDesk({ store: createFileStore(storeFile, { maxRecords }) });
   console.log(`Bookings and handovers are kept in ${storeFile}`);
+  const modelId = modelFromEnv();
   const callsFile = process.env.DESK_MODEL_CALLS_FILE ?? join(dirname(storeFile), 'model-calls.json');
   const model = process.env.NEBIUS_API_KEY && process.env.NEBIUS_BASE_URL
-    ? limitModelCalls(createNebiusModel(), { perDay, file: callsFile }) : undefined;
+    ? limitModelCalls(createNebiusModel({ model: modelId }), { perDay, file: callsFile }) : undefined;
   console.log(`Limits: ${maxRecords} stored records in total, ${perDay} model calls a Riyadh day`);
-  console.log(model ? 'Human door (chat) uses the model on Nebius Token Factory' : 'Human door (chat) is off: NEBIUS_API_KEY or NEBIUS_BASE_URL is not set');
+  console.log(model ? `Human door (chat) uses ${modelId} on Nebius Token Factory (DESK_MODEL to change it)` : 'Human door (chat) is off: NEBIUS_API_KEY or NEBIUS_BASE_URL is not set');
   const lang = langFromEnv();
   const trustProxy = process.env.TRUST_PROXY === 'cloudflare' ? 'cloudflare' : 'none';
   const ownerToken = process.env.OWNER_TOKEN || undefined;

@@ -26,6 +26,8 @@ export function handoverReply(reason, arabic) {
 }
 const AV = DATA.availability;
 export const DEFAULT_MODEL = 'nvidia/nemotron-3-super-120b-a12b';
+/** The model the human door calls: DESK_MODEL on the server, else DEFAULT_MODEL (unset or blank). */
+export const modelFromEnv = (env = process.env) => String(env.DESK_MODEL ?? '').trim() || DEFAULT_MODEL;
 const ARABIC = /[؀-ۿ]/;
 const KEEPS_TRANSCRIPT = new Set(['quote', 'book', 'handover']); // quote: a refusal it hands over keeps the chat
 // Messages the customer never saw (a reply the guard stopped, the desk's correction): kept out of history and transcripts.
@@ -411,7 +413,7 @@ const modelError = (code, message) => Object.assign(new Error(message), { code }
 /** A model on Nebius Token Factory (OpenAI-compatible chat completions), using built-in fetch.
  * Errors carry code model_timeout (no answer within timeoutMs) or model_error, for a polite reply. */
 export function createNebiusModel({ baseUrl = process.env.NEBIUS_BASE_URL, apiKey = process.env.NEBIUS_API_KEY,
-  model = DEFAULT_MODEL, temperature = 0, timeoutMs = 20_000, fetchImpl = fetch } = {}) {
+  model = modelFromEnv(), temperature = 0, timeoutMs = 20_000, fetchImpl = fetch } = {}) {
   if (!baseUrl || !apiKey) throw new Error('createNebiusModel needs NEBIUS_BASE_URL and NEBIUS_API_KEY');
   const url = `${baseUrl.replace(/\/$/, '')}/chat/completions`;
   return {
