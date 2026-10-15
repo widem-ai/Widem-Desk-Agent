@@ -1,17 +1,51 @@
 # Widem Agent Desk
 
-One brain, two doors. A service desk for a client-services business that answers customers in Arabic and English, prices their order correctly and books them, whether the customer types to it directly or sends their own AI agent.
-
-- **The human door:** a chat page on the business's site (`/`), backed by `POST /chat`.
-- **The agent door:** a remote MCP server that Claude, ChatGPT or any MCP client can connect to.
-
-Both doors call the same core, so a person and an agent asking for the same thing get the same quote.
+One brain, two doors. A service desk for a client-services business: it answers a customer's questions, prices their order and books a kickoff call. A person can type to it on a chat page, or a person's own AI agent can call it as an MCP server. Both doors call the same desk code with the same tool definitions, so the same order gets the same quote on both, and a model never decides a price, a tier or a free slot.
 
 > **Demo business, fictional.** The business in `data/demo-business.json` (Darb Career Studio) is invented for this demo. Its name, services and prices are made up, and no real person or company appears in this repository.
 
+## For judges: try it
+
+The desk is live at **https://desk.n8nwidem.uk**.
+
+- **Human door (chat page):** open https://desk.n8nwidem.uk in a browser and ask, for example, "What does a CV rewrite cost with 6 years of experience?" Then pick a time and book. Booking holds the slot until a simulated payment: the pay button charges nothing and asks for no card details.
+- **Agent door (MCP):** the endpoint is `https://desk.n8nwidem.uk/mcp` (Streamable HTTP, no sign-in). In Claude, add it as a remote custom connector: Settings, Connectors, Add custom connector, paste the URL. Then ask Claude to quote and book the same order and compare the total with the chat page. Any other MCP client works the same way, for example the MCP Inspector (`npx @modelcontextprotocol/inspector`) pointed at that URL.
+
+## NVIDIA and Nebius
+
+- **Model:** NVIDIA Nemotron 3 Super 120B (`nvidia/nemotron-3-super-120b-a12b`, set in `src/chat.mjs`), with tool calling, temperature 0.
+- **Nebius Token Factory** serves that model through its OpenAI-compatible API. It runs only the human door's conversation: choosing which tool to call and wording the reply. Prices, tiers, slots and bookings come from the desk code, and a guard (`src/guard.mjs`) blocks any reply that states an amount or a time the tools did not return. The agent door needs no model at all.
+- **Other Nebius services:** none. The server runs on our own VPS behind a Cloudflare tunnel.
+
+## Limits on the public demo
+
+- Agent door: 60 requests per address per 10 minutes, 300 per minute from everyone together, 10 new connections per address per 10 minutes.
+- Chat door: 20 messages per address per 10 minutes, 60 per minute together, 5 new chats per address per 10 minutes.
+- At most 3 active bookings per caller, so one script cannot empty the calendar.
+- A total cap on stored records (bookings and handovers; default 1000, `DESK_MAX_RECORDS`) and a daily cap on model calls (Riyadh day; default 150, `DESK_MODEL_CALLS_PER_DAY`), so the Token Factory credit lasts through judging. When the daily cap is reached the chat says so and the agent door keeps working.
+
+## How we test it
+
+- **Two doors, one answer:** `test/two-doors.test.mjs` sends the same five customer profiles through the chat door (scripted model, no network) and through the agent door (a real MCP client over HTTP), and asserts the identical quote and the identical stored booking; only the door and the transcript may differ.
+- **Adversarial set:** `scripts/live-adversarial.mjs` runs 11 hostile prompts (invented prices, hidden instructions, discount pressure and similar) twice on the real model and checks every reply with code; each checker is self-tested on a hand-written good and bad reply first.
+- **`npm run check`** runs every gate, including the unit tests, a secret scan of the files and the git history, and a check that this README names every agent-door tool. `npm run check -- --plant` also plants one deliberate break per guard and fails unless each break turns its gate red. `npm run check -- --live` adds the adversarial set and spends a few cents of Token Factory credit.
+
+## Run it locally
+
+Node 22 or later.
+
+```
+npm install
+npm test                 # unit tests, no network
+npm run check            # every gate
+npm start                # http://127.0.0.1:8790 (chat page at /, agent door at /mcp)
+```
+
+Without `NEBIUS_API_KEY` and `NEBIUS_BASE_URL` (in a gitignored `.env`, read with `node --env-file=.env src/mcp-server.mjs`) the agent door works fully and `/chat` answers 503. Details below.
+
 ## Status
 
-Built so far: the core (prices, free slots, bookings and handover to a person), the agent door (MCP, six tools), the chat endpoint for people (POST /chat, Nemotron calling the same tools) and the chat page at `/` (English). The owner page is built (slice 1: read only). Public hosting comes next.
+Built so far: the core (prices, free slots, bookings and handover to a person), the agent door (MCP, six tools), the chat endpoint for people (POST /chat, Nemotron calling the same tools) and the chat page at `/` (English). The owner page is built (read only). The desk is hosted at https://desk.n8nwidem.uk.
 
 The tools are defined once in `src/tools.mjs`. Five are shared by both doors; `pay` is on the agent door only (people pay with the button on the chat page), and `ask_choice` is on the chat door only (it shows answer buttons to a person).
 
