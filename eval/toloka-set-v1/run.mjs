@@ -13,9 +13,10 @@ import { createMemoryStore } from '../../src/store.mjs';
 const arg = (name, fallback) => { const i = process.argv.indexOf(name); return i === -1 ? fallback : process.argv[i + 1]; };
 const ONLY = arg('--only', null)?.split(',');
 const OUT = arg('--out', 'transcripts.json');
-const STOP_USD = Number(arg('--stop-usd', '0.25'));
-// Estimate only: Nemotron 3 Super's Token Factory price (models.dev, 2026-10-10), as in scripts/live-adversarial.mjs.
-// The price of nvidia/Nemotron-3.5-Super-VL is not confirmed; STOP_USD is set at half the USD 0.50 cap to absorb that.
+// The approved cap for the whole task is USD 0.50; 0.47 leaves room for the 2-conversation estimate run (USD 0.0282).
+const STOP_USD = Number(arg('--stop-usd', '0.47'));
+// nvidia/Nemotron-3.5-Super-VL's price from Token Factory's own GET /models?verbose=true on 2026-10-18:
+// prompt 0.0000003 and completion 0.0000009 USD per token. No cache discount is applied.
 const PRICE_IN = 0.30;
 const PRICE_OUT = 0.90;
 const usd = (u) => (u.prompt * PRICE_IN + u.completion * PRICE_OUT) / 1e6;
@@ -81,7 +82,7 @@ for (const s of scenarios.filter((x) => !ONLY || ONLY.includes(x.id))) {
 }
 
 const meta = { set: 'toloka-set-v1', model: MODEL, temperature: 0, door: 'chat (POST /chat, local server, memory store)',
-  price_estimate_usd_per_1m: { input: PRICE_IN, output: PRICE_OUT, source: 'models.dev Nemotron 3 Super, unconfirmed for this model' },
+  price_estimate_usd_per_1m: { input: PRICE_IN, output: PRICE_OUT, source: 'Token Factory GET /models?verbose=true, 2026-10-18' },
   usage: { ...total, usd_estimate: Number(usd(total).toFixed(4)) }, stopped };
 const outPath = new URL(OUT, import.meta.url);
 writeFileSync(outPath, `${JSON.stringify({ ...meta, conversations }, null, 2)}\n`);
