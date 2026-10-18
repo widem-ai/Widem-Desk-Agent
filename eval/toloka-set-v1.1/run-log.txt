@@ -1,0 +1,6 @@
+Q04: 5 calls, 24155 in, 1914 out; total USD 0.0090
+Q08: 6 calls, 28801 in, 1408 out; total USD 0.0189
+Q12: 7 calls, 36156 in, 1549 out; total USD 0.0311
+Q16: 6 calls, 30591 in, 1671 out; total USD 0.0418
+K04: 9 calls, 55255 in, 3318 out; total USD 0.0614
+model nvidia/Nemotron-3.5-Super-VL; 5 conversations; 33 model calls, 174958 in, 9860 out; about USD 0.0614

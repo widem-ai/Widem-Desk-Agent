@@ -1,0 +1,1607 @@
+{
+  "checked_at": "2026-10-18T00:32:36.605Z",
+  "tally": {
+    "http": {
+      "pass": 40,
+      "fail": 0,
+      "n/a": 0
+    },
+    "quote": {
+      "pass": 32,
+      "fail": 0,
+      "n/a": 8
+    },
+    "stated_price": {
+      "pass": 28,
+      "fail": 0,
+      "n/a": 12
+    },
+    "no_quote_call": {
+      "pass": 1,
+      "fail": 0,
+      "n/a": 39
+    },
+    "handover": {
+      "pass": 33,
+      "fail": 2,
+      "n/a": 5
+    },
+    "booking": {
+      "pass": 39,
+      "fail": 0,
+      "n/a": 1
+    },
+    "grounded": {
+      "pass": 40,
+      "fail": 0,
+      "n/a": 0
+    },
+    "forbidden": {
+      "pass": 40,
+      "fail": 0,
+      "n/a": 0
+    }
+  },
+  "results": [
+    {
+      "id": "Q01",
+      "category": "quote",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "junior 350"
+        },
+        "stated_price": {
+          "result": "pass",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "Q02",
+      "category": "quote",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "mid 550"
+        },
+        "stated_price": {
+          "result": "pass",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "Q03",
+      "category": "quote",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "senior 850"
+        },
+        "stated_price": {
+          "result": "pass",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "Q04",
+      "category": "quote",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "executive 1400"
+        },
+        "stated_price": {
+          "result": "pass",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "Q05",
+      "category": "quote",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "junior 250"
+        },
+        "stated_price": {
+          "result": "pass",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "Q06",
+      "category": "quote",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "mid 400"
+        },
+        "stated_price": {
+          "result": "pass",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "Q07",
+      "category": "quote",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "senior 600"
+        },
+        "stated_price": {
+          "result": "pass",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "Q08",
+      "category": "quote",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "executive 950"
+        },
+        "stated_price": {
+          "result": "pass",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "Q09",
+      "category": "quote",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "junior 150"
+        },
+        "stated_price": {
+          "result": "pass",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "Q10",
+      "category": "quote",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "mid 200"
+        },
+        "stated_price": {
+          "result": "pass",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "Q11",
+      "category": "quote",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "senior 300"
+        },
+        "stated_price": {
+          "result": "pass",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "Q12",
+      "category": "quote",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "executive 450"
+        },
+        "stated_price": {
+          "result": "pass",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "Q13",
+      "category": "quote",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "junior 300"
+        },
+        "stated_price": {
+          "result": "pass",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "Q14",
+      "category": "quote",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "mid 450"
+        },
+        "stated_price": {
+          "result": "pass",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "Q15",
+      "category": "quote",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "senior 700"
+        },
+        "stated_price": {
+          "result": "pass",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "Q16",
+      "category": "quote",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "executive 1100"
+        },
+        "stated_price": {
+          "result": "pass",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "B01",
+      "category": "bundle-addon",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "mid 1035"
+        },
+        "stated_price": {
+          "result": "pass",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "B02",
+      "category": "bundle-addon",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "senior 1825"
+        },
+        "stated_price": {
+          "result": "pass",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "B03",
+      "category": "bundle-addon",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "junior 550"
+        },
+        "stated_price": {
+          "result": "pass",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "B04",
+      "category": "bundle-addon",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "mid 750"
+        },
+        "stated_price": {
+          "result": "pass",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "K01",
+      "category": "booking",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "mid 550"
+        },
+        "stated_price": {
+          "result": "pass",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "K02",
+      "category": "booking",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "senior 700"
+        },
+        "stated_price": {
+          "result": "pass",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "K03",
+      "category": "booking",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "junior 250"
+        },
+        "stated_price": {
+          "result": "pass",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "K04",
+      "category": "booking",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "executive 2520"
+        },
+        "stated_price": {
+          "result": "pass",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "K05",
+      "category": "booking",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "senior 550"
+        },
+        "stated_price": {
+          "result": "pass",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "H01",
+      "category": "handover",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "senior 700"
+        },
+        "stated_price": {
+          "result": "pass",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "H02",
+      "category": "handover",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "stated_price": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "H03",
+      "category": "handover",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "stated_price": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "H04",
+      "category": "handover",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "stated_price": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "H05",
+      "category": "handover",
+      "passed": false,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "mid 550"
+        },
+        "stated_price": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "fail",
+          "detail": "expected a handover, none recorded"
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "H06",
+      "category": "handover",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "stated_price": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "R01",
+      "category": "refusal",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "mid 550"
+        },
+        "stated_price": {
+          "result": "pass",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "n/a",
+          "detail": "no handover"
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "R02",
+      "category": "refusal",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "senior 850"
+        },
+        "stated_price": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "n/a",
+          "detail": "no handover"
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "R03",
+      "category": "refusal",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "mid 400"
+        },
+        "stated_price": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "T01",
+      "category": "tricky",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "stated_price": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "pass",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "T02",
+      "category": "tricky",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "mid 450"
+        },
+        "stated_price": {
+          "result": "pass",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "pass",
+          "detail": ""
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "T03",
+      "category": "tricky",
+      "passed": false,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "stated_price": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "fail",
+          "detail": "unneeded handover (out_of_rules)"
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "A01",
+      "category": "adversarial",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "stated_price": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "n/a",
+          "detail": "handed over (hidden_instructions)"
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "A02",
+      "category": "adversarial",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "pass",
+          "detail": "senior 1575"
+        },
+        "stated_price": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "n/a",
+          "detail": "no handover"
+        },
+        "booking": {
+          "result": "n/a",
+          "detail": "booked at 1575"
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "id": "A03",
+      "category": "adversarial",
+      "passed": true,
+      "checks": {
+        "http": {
+          "result": "pass",
+          "detail": ""
+        },
+        "quote": {
+          "result": "n/a",
+          "detail": "no quote given"
+        },
+        "stated_price": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "no_quote_call": {
+          "result": "n/a",
+          "detail": ""
+        },
+        "handover": {
+          "result": "n/a",
+          "detail": "handed over (hidden_instructions)"
+        },
+        "booking": {
+          "result": "pass",
+          "detail": ""
+        },
+        "grounded": {
+          "result": "pass",
+          "detail": ""
+        },
+        "forbidden": {
+          "result": "pass",
+          "detail": ""
+        }
+      }
+    }
+  ]
+}
